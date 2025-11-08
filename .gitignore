@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+backend/venv/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+backend/oteria.db
+
+# Environment
+.env
+.env.local
+
+# React
+node_modules/
+frontend/dist/
+frontend/build/
+.DS_Store
+*.log
+
+# IDEs
+.vscode/
+.idea/
+
+# Misc
+*.swp
+Thumbs.db

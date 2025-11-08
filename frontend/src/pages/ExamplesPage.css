@@ -1,0 +1,258 @@
+.examples-page {
+  min-height: 100vh;
+  background: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+}
+
+.examples-header {
+  background: white;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.examples-header h1 {
+  font-size: 1.5rem;
+  font-weight: 400;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.examples-container {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.scripts-sidebar {
+  width: 300px;
+  background: white;
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  padding: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sidebar-header h2 {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #2c3e50;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 0.85rem;
+}
+
+.script-count {
+  background: #ecf0f1;
+  color: #7f8c8d;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.scripts-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.category-group {
+  margin-bottom: 1rem;
+}
+
+.category-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #7f8c8d;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.script-item {
+  padding: 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 0.25rem;
+}
+
+.script-item:hover {
+  background: #f8f9fa;
+}
+
+.script-item.active {
+  background: #2c3e50;
+}
+
+.script-item.active .script-name,
+.script-item.active .script-desc {
+  color: white;
+}
+
+.script-name {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #2c3e50;
+  margin-bottom: 0.25rem;
+}
+
+.script-desc {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  line-height: 1.4;
+}
+
+.script-viewer {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
+}
+
+.viewer-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #95a5a6;
+  font-style: italic;
+}
+
+.viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.viewer-header h2 {
+  font-size: 1.5rem;
+  font-weight: 400;
+  color: #2c3e50;
+  margin: 0 0 0.5rem 0;
+}
+
+.viewer-header p {
+  font-size: 0.95rem;
+  color: #7f8c8d;
+  margin: 0;
+}
+
+.btn-run {
+  padding: 0.75rem 1.5rem;
+  background: #2c3e50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-run:hover:not(:disabled) {
+  background: #34495e;
+}
+
+.btn-run:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.code-section,
+.result-section {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+
+.section-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #7f8c8d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0.75rem 1rem;
+  background: #fafafa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.code-display {
+  padding: 1rem;
+  margin: 0;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #2c3e50;
+  overflow-x: auto;
+  background: #fafafa;
+}
+
+.output-display,
+.error-display {
+  padding: 1rem;
+}
+
+.result-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.output-display .result-label {
+  color: #27ae60;
+}
+
+.error-display .result-label {
+  color: #e74c3c;
+}
+
+.output-display pre,
+.error-display pre {
+  margin: 0;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  padding: 0.75rem;
+  background: #fafafa;
+  border-radius: 4px;
+  overflow-x: auto;
+  border-left: 3px solid;
+}
+
+.output-display pre {
+  border-left-color: #27ae60;
+  color: #2c3e50;
+}
+
+.error-display pre {
+  border-left-color: #e74c3c;
+  color: #c0392b;
+}
+
+@media (max-width: 1024px) {
+  .examples-container {
+    flex-direction: column;
+  }
+
+  .scripts-sidebar {
+    width: 100%;
+    max-height: 300px;
+  }
+}

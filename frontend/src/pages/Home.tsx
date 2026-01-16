@@ -6,9 +6,12 @@ import './Home.css'
 function Home() {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
-  const [backendStatus, setBackendStatus] = useState<string>('Checking...')
-  const API_URL = 'http://localhost:5000'
 
+  // Status de connexion au backend
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'error'>('checking')
+  const API_URL = ''
+
+  // Verification du backend au chargement
   useEffect(() => {
     checkBackendHealth()
   }, [])
@@ -17,12 +20,12 @@ function Home() {
     try {
       const response = await fetch(`${API_URL}/api/health`)
       if (response.ok) {
-        setBackendStatus('Connected')
+        setBackendStatus('connected')
       } else {
-        setBackendStatus('Connection Error')
+        setBackendStatus('error')
       }
-    } catch (err) {
-      setBackendStatus('Backend Unavailable')
+    } catch {
+      setBackendStatus('error')
     }
   }
 
@@ -32,55 +35,63 @@ function Home() {
 
   return (
     <div className="home">
-      <div className="home-container">
-        <div className="home-header">
-          <div className="header-left">
-            <h1>Oteria Python</h1>
-            <p className="home-subtitle">Python Script Executor</p>
-          </div>
-          <div className="header-right">
-            {user ? (
-              <div className="user-info">
-                <span className="user-name">Hello, {user.username}</span>
-                <button className="btn-logout" onClick={handleLogout}>Logout</button>
-              </div>
-            ) : (
-              <div className="auth-buttons">
-                <button className="btn-login" onClick={() => navigate('/login')}>Login</button>
-                <button className="btn-register" onClick={() => navigate('/register')}>Register</button>
-              </div>
-            )}
-          </div>
+      {/* Header */}
+      <header className="home-header">
+        <div className="header-brand">
+          <span className="brand-name">BurpKiller</span>
         </div>
 
-        <div className="status-section">
-          <div className="status-indicator">
-            <span className={`status-dot ${backendStatus === 'Connected' ? 'connected' : 'disconnected'}`}></span>
-            <span className="status-text">Backend: {backendStatus}</span>
-          </div>
-        </div>
+        <nav className="header-nav">
+          {user ? (
+            <div className="user-section">
+              <span className="user-name">{user.username}</span>
+              <button className="btn btn-secondary" onClick={handleLogout}>
+                Logout
+              </button>
+            </div>
+          ) : (
+            <div className="auth-section">
+              <button className="btn btn-secondary" onClick={() => navigate('/login')}>
+                Login
+              </button>
+              <button className="btn btn-primary" onClick={() => navigate('/register')}>
+                Register
+              </button>
+            </div>
+          )}
+        </nav>
+      </header>
 
-        <div className="home-actions">
-          <button className="btn-primary" onClick={() => navigate('/test')}>
-            Test Scripts
-          </button>
+      {/* Hero Section */}
+      <section className="hero">
+        <h1 className="hero-title">Web Security Testing</h1>
+        <p className="hero-subtitle">
+          Outil collaboratif de reconnaissance et d'analyse de securite web.
+        </p>
+        <div className="hero-actions">
+          {user ? (
+            <button className="btn btn-primary btn-large" onClick={() => navigate('/investigations')}>
+              Mes enquetes
+            </button>
+          ) : (
+            <button className="btn btn-primary btn-large" onClick={() => navigate('/register')}>
+              Commencer
+            </button>
+          )}
         </div>
+      </section>
 
-        <div className="home-info">
-          <div className="info-card">
-            <h3>Execute Python Scripts</h3>
-            <p>Run Python code directly from your browser with real-time results</p>
-          </div>
-          <div className="info-card">
-            <h3>Example Library</h3>
-            <p>Access example scripts from the side drawer in the Test page</p>
-          </div>
-          <div className="info-card">
-            <h3>Custom Scripts</h3>
-            <p>Write and test your own Python code with instant feedback</p>
-          </div>
+      {/* Footer avec status */}
+      <footer className="home-footer">
+        <div className="status-indicator">
+          <span className={`status-dot status-${backendStatus}`}></span>
+          <span className="status-text">
+            {backendStatus === 'checking' && 'Connexion...'}
+            {backendStatus === 'connected' && 'Backend connecte'}
+            {backendStatus === 'error' && 'Backend hors ligne'}
+          </span>
         </div>
-      </div>
+      </footer>
     </div>
   )
 }

@@ -1,146 +1,219 @@
-# Oteria Python - Exécuteur de Scripts Python
+# Oteria BurpKiller
 
-Application web permettant d'exécuter des scripts Python depuis une interface React moderne.
+Application web collaborative de tests de sécurité pour l'apprentissage de la cybersécurité. Alternative légère à Burp Suite développée dans le cadre d'un cours de Python cybersécurité.
 
-## ✨ Fonctionnalités
+## Fonctionnalités
 
-- 🚀 **Exécution de scripts Python** en temps réel
-- 📁 **Chargement automatique** des scripts depuis le dossier `backend/scripts/`
-- 🏷️ **Organisation par catégories** (Bases, Algorithmes, Mathématiques...)
-- 🎨 **Interface moderne** avec React + Vite + TypeScript
-- 🔄 **Hot-reload** pour le développement
-- ✅ **Gestion des erreurs** et affichage des résultats
-- 📝 **Éditeur de code** intégré
+### Reconnaissance
+- Scanner HTTP de découverte de paths (wordlist customisable)
+- Visualisation en graphe interactif des résultats
+- Support des modes: stealth, normal, aggressive
+- Progression en temps réel
 
-## Structure du Projet
+### Enumération
+- Détection automatique des technologies (serveur, framework, CMS)
+- Analyse des headers HTTP de sécurité
+- Évaluation du niveau de sécurité
 
-```
-OteriaPython/
-├── backend/                    # Serveur Flask (Python)
-│   ├── app.py                 # Orchestrateur principal
-│   ├── scripts/               # 📁 Scripts Python (chargés automatiquement)
-│   │   ├── hello_world.py
-│   │   ├── calculs.py
-│   │   ├── boucles.py
-│   │   ├── listes.py
-│   │   ├── fibonacci.py
-│   │   ├── dictionnaires.py
-│   │   └── README.md
-│   ├── requirements.txt
-│   └── venv/
-├── frontend/                   # Application React + TypeScript
-│   ├── src/
-│   │   ├── App.tsx
-│   │   ├── App.css
-│   │   └── main.tsx
-│   ├── package.json
-│   └── ...
-├── start-backend.ps1          # Script de démarrage backend
-├── start-frontend.ps1         # Script de démarrage frontend
-├── COMMANDES.md               # 📋 Guide complet des commandes
-├── AJOUTER_SCRIPTS.md         # 📝 Comment ajouter des scripts
-└── README.md
-```
+### Exploitation
+- Scanner SQL Injection (error-based, boolean-based, time-based, UNION)
+- Scanner XSS (reflected, avec détection de filtres)
+- Analyse JavaScript pour détecter les secrets exposés:
+  - Google API Keys
+  - AWS Access Keys
+  - Stripe Keys
+  - GitHub Tokens
+  - JWT Tokens
+  - API Keys génériques
+  - Endpoints API cachés
+- Request Builder HTTP (comme Burp Repeater)
+- Historique des requêtes HTTP avec replay
+
+### Collaboration
+- Enquêtes collaboratives multi-utilisateurs
+- Système d'authentification (register/login)
+- Partage de fichiers entre membres
+- Gestion des permissions (viewer, editor, admin)
+
+## Stack Technique
+
+### Backend
+- Flask (Python 3.x)
+- SQLAlchemy ORM
+- Flask-Login pour l'authentification
+- BeautifulSoup4 pour le parsing HTML
+- Requests pour les requêtes HTTP
+
+### Frontend
+- React + TypeScript
+- Vite (build tool)
+- React Router pour la navigation
+- React Flow pour la visualisation de graphes
 
 ## Installation
 
-### Backend (Python)
+### Prérequis
+- Python 3.8+
+- Node.js 16+
+- Git
 
-1. Créer un environnement virtuel :
+### Backend
+
 ```bash
 cd backend
 python -m venv venv
 venv\Scripts\activate    # Windows
-venv/bin/activate        # Linux
-source activate
+source venv/bin/activate # Linux/Mac
 pip install -r requirements.txt
 ```
 
-2. Lancer le serveur Flask :
+Initialiser la base de données:
+```python
+python
+>>> from app import app, db
+>>> with app.app_context():
+...     db.create_all()
+>>> exit()
+```
+
+Lancer le serveur:
 ```bash
 python app.py
 ```
 
 Le backend sera accessible sur http://localhost:5000
 
-### Frontend (React)
+### Frontend
 
-1. Installer les dépendances :
 ```bash
 cd frontend
 npm install
-```
-
-2. Lancer l'application React :
-```bash
 npm run dev
 ```
 
 Le frontend sera accessible sur http://localhost:5173
 
-## 🎯 Démarrage Rapide
+## Utilisation
 
-### 1️⃣ Lancer le Backend
-```powershell
-cd c:\Users\robin\Code\OteriaPython
-.\start-backend.ps1
-```
+### 1. Créer un compte
+- Accéder à http://localhost:5173
+- S'enregistrer avec email/username/password
 
-### 2️⃣ Lancer le Frontend (dans un nouveau terminal)
-```powershell
-cd c:\Users\robin\Code\OteriaPython
-.\start-frontend.ps1
-```
+### 2. Créer une investigation
+- Cliquer sur "Nouvelle Investigation"
+- Renseigner le nom et l'URL cible
+- Définir si l'investigation est publique/collaborative
 
-### 3️⃣ Ouvrir le navigateur
-http://localhost:5173
+### 3. Lancer des scans
 
----
+**Reconnaissance:**
+- Onglet "Reconnaissance"
+- Choisir un mode de scan (stealth/normal/aggressive)
+- Sélectionner une wordlist
+- Lancer le scan
+- Visualiser les résultats en graphe ou liste
 
-## 📝 Ajouter un nouveau script
+**Enumération:**
+- Onglet "Enumeration"
+- Cliquer sur "Lancer le scan"
+- Consulter les technologies détectées et headers de sécurité
 
-**C'est ultra simple !** Le système charge automatiquement tous les fichiers `.py` du dossier `backend/scripts/`.
+**Exploitation:**
+- Onglet "Exploitation"
+- Scanner SQLi, XSS ou scan complet
+- Scanner JavaScript pour les secrets
+- Utiliser le Request Builder pour tester manuellement
 
-### Créez un fichier dans `backend/scripts/mon_script.py` :
-
-```python
-# -*- coding: utf-8 -*-
-"""
-name: Mon Super Script
-description: Description de ce que fait le script
-category: Ma Categorie
-"""
-
-print("Hello from my script!")
-```
-
-### Rechargez la page web → Le script apparaît automatiquement ! 🎉
-
-**📖 Guide complet :** Consultez [`AJOUTER_SCRIPTS.md`](AJOUTER_SCRIPTS.md)
-
----
-
-## 🏗️ Architecture
-
-- **Frontend** (React + TypeScript) → Port 5173
-- **Backend** (Flask + Python) → Port 5000
-- **Communication** : API REST (JSON)
+## Architecture
 
 ```
-Frontend ←──(HTTP/JSON)──→ Backend ←──(charge)──→ scripts/*.py
+frontend/
+├── src/
+│   ├── pages/
+│   │   ├── Home.tsx              # Page d'accueil
+│   │   ├── Investigation.tsx     # Page principale d'une investigation
+│   │   └── InvestigationsList.tsx
+│   ├── components/
+│   │   ├── ReconGraph.tsx        # Visualisation graphe reconnaissance
+│   │   ├── ReconList.tsx         # Liste des résultats recon
+│   │   ├── EnumDisplay.tsx       # Affichage enumération
+│   │   ├── VulnDisplay.tsx       # Affichage vulnérabilités
+│   │   ├── RequestBuilder.tsx    # Builder requêtes HTTP
+│   │   └── HttpHistory.tsx       # Historique HTTP
+│   └── context/
+│       └── AuthContext.tsx       # Gestion authentification
+
+backend/
+├── app.py                        # Orchestrateur principal
+├── models.py                     # Modèles SQLAlchemy
+├── auth.py                       # Blueprint authentification
+├── investigations.py             # Blueprint investigations
+├── recon.py                      # Blueprint reconnaissance
+├── enumeration.py                # Blueprint enumération
+├── vulns.py                      # Blueprint vulnérabilités
+├── http_tools.py                 # Blueprint HTTP tools
+└── scripts/
+    ├── http_scanner.py           # Scanner de paths HTTP
+    ├── tech_detector.py          # Détection de technologies
+    ├── sqli_scanner.py           # Scanner SQL Injection
+    ├── xss_scanner.py            # Scanner XSS
+    └── js_secret_scanner.py      # Scanner secrets JavaScript
 ```
-
-### Workflow d'exécution
-
-1. L'utilisateur clique sur un script ou écrit du code
-2. Le frontend envoie le code au backend via `/api/execute`
-3. Le backend crée un fichier temporaire
-4. Python exécute le fichier
-5. Les résultats (stdout/stderr) sont renvoyés au frontend
-6. Affichage dans l'interface
 
 ## API Endpoints
 
-- `GET /api/health` - Vérifier l'état du serveur
-- `POST /api/execute` - Exécuter un script Python
-- `GET /api/scripts` - Obtenir des scripts d'exemple
+### Authentication
+- `POST /api/register` - Créer un compte
+- `POST /api/login` - Se connecter
+- `POST /api/logout` - Se déconnecter
+- `GET /api/check-auth` - Vérifier l'authentification
+
+### Investigations
+- `GET /api/investigations` - Liste des investigations
+- `POST /api/investigations` - Créer une investigation
+- `GET /api/investigations/<id>` - Détails d'une investigation
+- `PUT /api/investigations/<id>` - Modifier une investigation
+- `DELETE /api/investigations/<id>` - Supprimer une investigation
+
+### Reconnaissance
+- `POST /api/investigations/<id>/scan` - Lancer un scan
+- `GET /api/investigations/<id>/scans` - Liste des scans
+- `GET /api/scans/<id>/results` - Résultats d'un scan
+
+### Enumération
+- `POST /api/investigations/<id>/enum` - Lancer scan enumération
+- `GET /api/investigations/<id>/enum` - Résultats enumération
+
+### Exploitation
+- `POST /api/investigations/<id>/vuln-scan` - Lancer scan vulnérabilités
+- `GET /api/investigations/<id>/vuln-scans` - Liste des scans vulns
+- `GET /api/vuln-scans/<id>/results` - Résultats scan vulnérabilités
+- `POST /api/investigations/<id>/js-scan` - Lancer scan JavaScript
+- `GET /api/investigations/<id>/js-secrets` - Secrets JavaScript trouvés
+
+### HTTP Tools
+- `POST /api/investigations/<id>/http-requests` - Envoyer requête HTTP
+- `GET /api/investigations/<id>/http-requests` - Historique requêtes
+- `GET /api/http-requests/<id>` - Détails requête
+- `DELETE /api/http-requests/<id>` - Supprimer requête
+
+## Sécurité
+
+**ATTENTION:** Cet outil est destiné à un usage éducatif uniquement.
+
+- Ne testez JAMAIS des applications sans autorisation explicite
+- Respectez les lois et réglementations en vigueur
+- Utilisez uniquement sur vos propres applications ou avec permission écrite
+- Les scans peuvent être détectés par les WAF et systèmes de sécurité
+
+## Avertissement
+
+Ce projet est développé dans un cadre pédagogique. Il n'est pas destiné à remplacer des outils professionnels comme Burp Suite, OWASP ZAP ou Acunetix. Les scanners sont basiques et peuvent produire des faux positifs.
+
+## License
+
+Projet éducatif - MIT License
+
+## Auteurs
+
+Robin BRG avec l'assistance de Claude Sonnet 4.5

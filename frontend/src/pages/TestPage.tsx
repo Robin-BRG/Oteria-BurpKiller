@@ -27,7 +27,7 @@ function TestPage() {
   const [scripts, setScripts] = useState<Script[]>([])
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false)
 
-  const API_URL = 'http://localhost:5000'
+  const API_URL = ''
 
   useEffect(() => {
     loadExampleScripts()

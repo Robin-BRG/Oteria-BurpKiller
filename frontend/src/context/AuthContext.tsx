@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const API_URL = 'http://localhost:5000'
+  const API_URL = ''
 
   useEffect(() => {
     checkAuth()

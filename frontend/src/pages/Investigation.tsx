@@ -7,6 +7,8 @@ import EnumDisplay from '../components/EnumDisplay'
 import RequestBuilder from '../components/RequestBuilder'
 import HttpHistory from '../components/HttpHistory'
 import VulnDisplay from '../components/VulnDisplay'
+import NetworkDisplay from '../components/NetworkDisplay'
+import ADDisplay from '../components/ADDisplay'
 import type { ReconResult } from '../components/ReconGraph'
 import type { EnumResult } from '../components/EnumDisplay'
 import './Investigation.css'
@@ -90,6 +92,8 @@ const TABS = [
   { id: 'general', label: 'General' },
   { id: 'recon', label: 'Reconnaissance' },
   { id: 'enum', label: 'Enumeration' },
+  { id: 'network', label: 'Network' },
+  { id: 'ad', label: 'Active Directory' },
   { id: 'exploit', label: 'Exploitation' },
   { id: 'rapport', label: 'Rapport' }
 ]
@@ -737,6 +741,40 @@ function Investigation() {
                 </ul>
               </div>
             )}
+          </div>
+        )
+
+      case 'network':
+        return (
+          <div className="tab-content network-tab">
+            <NetworkDisplay
+              investigationId={investigation.id}
+              targetHost={(() => {
+                try {
+                  const url = new URL(investigation.target_url)
+                  return url.hostname
+                } catch {
+                  return ''
+                }
+              })()}
+            />
+          </div>
+        )
+
+      case 'ad':
+        return (
+          <div className="tab-content ad-tab">
+            <ADDisplay
+              investigationId={investigation.id}
+              targetHost={(() => {
+                try {
+                  const url = new URL(investigation.target_url)
+                  return url.hostname
+                } catch {
+                  return ''
+                }
+              })()}
+            />
           </div>
         )
 

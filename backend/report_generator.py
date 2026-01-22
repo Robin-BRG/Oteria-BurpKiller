@@ -60,8 +60,7 @@ def generate_html_report(investigation, user):
             report_data['recon_results'].append({
                 'path': result.path,
                 'status_code': result.status_code,
-                'content_length': result.content_length,
-                'response_time': result.response_time
+                'content_length': result.content_length
             })
 
     # Enumération
@@ -72,8 +71,7 @@ def generate_html_report(investigation, user):
             report_data['enum_results'].append({
                 'result_type': result.result_type,
                 'name': result.name,
-                'value': result.value,
-                'severity': result.severity
+                'value': result.value
             })
 
     # Scans réseau
@@ -585,7 +583,6 @@ def generate_html_report(investigation, user):
                         <th>Chemin</th>
                         <th>Status</th>
                         <th>Taille</th>
-                        <th>Temps (ms)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -594,7 +591,6 @@ def generate_html_report(investigation, user):
                         <td><code>{{ result.path }}</code></td>
                         <td><span class="badge {% if result.status_code >= 200 and result.status_code < 300 %}success{% elif result.status_code >= 400 %}warning{% else %}info{% endif %}">{{ result.status_code }}</span></td>
                         <td>{{ result.content_length or '-' }} bytes</td>
-                        <td>{{ result.response_time or '-' }}</td>
                     </tr>
                     {% endfor %}
                     {% if recon_results|length > 50 %}

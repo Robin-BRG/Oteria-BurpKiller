@@ -55,7 +55,17 @@ def get_pdf_report(inv_id):
         )
 
     except Exception as e:
-        return jsonify({'error': f'Erreur lors de la génération du rapport PDF: {str(e)}'}), 500
+        error_msg = str(e)
+
+        # Message spécifique pour Windows/GTK
+        if 'libgobject' in error_msg or 'GTK' in error_msg:
+            return jsonify({
+                'error': 'La génération PDF nécessite GTK+ (difficile à installer sur Windows).',
+                'workaround': 'Solution: Générer le rapport HTML puis utiliser "Imprimer > Enregistrer en PDF" de votre navigateur.',
+                'details': error_msg
+            }), 500
+
+        return jsonify({'error': f'Erreur lors de la génération du rapport PDF: {error_msg}'}), 500
 
 
 @reports_bp.route('/api/investigations/<int:inv_id>/report/preview', methods=['GET'])

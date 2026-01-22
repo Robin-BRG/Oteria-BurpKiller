@@ -183,6 +183,28 @@ python app.py
 
 Le backend est accessible sur http://localhost:5000
 
+### Tests unitaires
+
+Lancer les tests :
+
+```bash
+cd backend
+pytest tests/ -v
+```
+
+Avec couverture de code :
+
+```bash
+pytest tests/ --cov=. --cov-report=html
+```
+
+Statistiques actuelles :
+- 53 tests au total
+- 48 tests qui passent (90%)
+- 51% de couverture de code
+
+Voir [backend/tests/README.md](backend/tests/README.md) pour plus de détails.
+
 ### Installation du frontend
 
 ```bash

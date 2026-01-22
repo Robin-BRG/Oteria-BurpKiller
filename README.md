@@ -258,8 +258,11 @@ chmod +x start-dev.sh
 - Historique HTTP : consulter et rejouer les requetes
 
 #### Onglet Rapport
-- Synthese des resultats (a implementer)
-- Export PDF/HTML (a implementer)
+- Aperçu des statistiques de l'investigation
+- Génération de rapports HTML professionnels
+- Téléchargement PDF (nécessite GTK+ sur Windows, ou utiliser Imprimer > PDF du navigateur)
+- Résumé exécutif avec compteurs de vulnérabilités
+- Tableaux détaillés de tous les résultats de scans
 
 ---
 
@@ -344,6 +347,14 @@ chmod +x start-dev.sh
 | GET | /api/http-requests/:id | Details requete |
 | DELETE | /api/http-requests/:id | Supprimer requete |
 
+### Reporting
+
+| Methode | Endpoint | Description |
+|---------|----------|-------------|
+| GET | /api/investigations/:id/report/html | Generer rapport HTML |
+| GET | /api/investigations/:id/report/pdf | Telecharger rapport PDF |
+| GET | /api/investigations/:id/report/preview | Apercu donnees rapport |
+
 ---
 
 ## Structure du projet
@@ -362,6 +373,8 @@ Oteria-BurpKiller/
 |   |-- ad.py                     # Blueprint Active Directory
 |   |-- vulns.py                  # Blueprint vulnerabilites
 |   |-- http_tools.py             # Blueprint HTTP tools
+|   |-- reports.py                # Blueprint reporting
+|   |-- report_generator.py       # Generateur de rapports HTML/PDF
 |   |-- requirements.txt          # Dependances Python
 |   |
 |   |-- scripts/
@@ -394,6 +407,7 @@ Oteria-BurpKiller/
 |   |   |   |-- VulnDisplay.tsx   # Affichage vulnerabilites
 |   |   |   |-- RequestBuilder.tsx # Builder HTTP
 |   |   |   |-- HttpHistory.tsx   # Historique requetes
+|   |   |   |-- ReportGenerator.tsx # Generateur de rapports
 |   |   |
 |   |   |-- context/
 |   |       |-- AuthContext.tsx   # Context authentification

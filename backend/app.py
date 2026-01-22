@@ -27,6 +27,7 @@ from http_tools import http_bp
 from vulns import vulns_bp
 from network import network_bp
 from ad import ad_bp
+from reports import reports_bp
 
 db.init_app(app)
 bcrypt.init_app(app)
@@ -50,6 +51,7 @@ app.register_blueprint(http_bp)
 app.register_blueprint(vulns_bp)
 app.register_blueprint(network_bp)
 app.register_blueprint(ad_bp)
+app.register_blueprint(reports_bp)
 
 @app.route('/api/health', methods=['GET'])
 def health():

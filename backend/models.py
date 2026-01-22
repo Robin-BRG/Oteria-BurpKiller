@@ -64,6 +64,8 @@ class Investigation(db.Model):
     http_requests = db.relationship('HttpRequest', backref='investigation', lazy='dynamic', cascade='all, delete-orphan')
     vuln_scans = db.relationship('VulnerabilityScan', backref='investigation', lazy='dynamic', cascade='all, delete-orphan')
     js_secrets = db.relationship('JsSecret', backref='investigation', lazy='dynamic', cascade='all, delete-orphan')
+    network_scans = db.relationship('NetworkScan', backref='investigation', lazy='dynamic', cascade='all, delete-orphan')
+    ad_scans = db.relationship('ADScan', backref='investigation', lazy='dynamic', cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<Investigation {self.name}>'
@@ -516,4 +518,196 @@ class InvestigationFile(db.Model):
             'file_size': self.file_size,
             'uploaded_by': self.uploaded_by.to_dict() if self.uploaded_by else None,
             'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+
+# ============================================================================
+# MODELES NETWORK (Scan reseau)
+# ============================================================================
+
+class NetworkScan(db.Model):
+    """Scan reseau (ports, ping sweep)"""
+    __tablename__ = 'network_scans'
+
+    id = db.Column(db.Integer, primary_key=True)
+    investigation_id = db.Column(db.Integer, db.ForeignKey('investigations.id'), nullable=False)
+    started_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+
+    # Cible du scan
+    target = db.Column(db.String(500), nullable=False)
+
+    # Type: quick, full, all (pour portscan) ou pingsweep
+    scan_type = db.Column(db.String(50), default='quick')
+    scan_mode = db.Column(db.String(50), default='portscan')  # portscan, pingsweep
+
+    # Status: pending, running, completed, failed
+    status = db.Column(db.String(20), default='pending')
+    error_message = db.Column(db.Text, nullable=True)
+
+    # Progress
+    progress_current = db.Column(db.Integer, default=0)
+    progress_total = db.Column(db.Integer, default=0)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime, nullable=True)
+
+    # Relations
+    started_by = db.relationship('User', backref='started_network_scans')
+    results = db.relationship('NetworkResult', backref='scan', lazy='dynamic', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<NetworkScan {self.id} - {self.target}>'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'investigation_id': self.investigation_id,
+            'target': self.target,
+            'scan_type': self.scan_type,
+            'scan_mode': self.scan_mode,
+            'status': self.status,
+            'error_message': self.error_message,
+            'progress_current': self.progress_current,
+            'progress_total': self.progress_total,
+            'started_by': self.started_by.to_dict() if self.started_by else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+            'results_count': self.results.count()
+        }
+
+
+class NetworkResult(db.Model):
+    """Resultat de scan reseau (port ouvert, hote actif)"""
+    __tablename__ = 'network_results'
+
+    id = db.Column(db.Integer, primary_key=True)
+    scan_id = db.Column(db.Integer, db.ForeignKey('network_scans.id'), nullable=False)
+
+    # Infos hote
+    ip = db.Column(db.String(50), nullable=False)
+    hostname = db.Column(db.String(255), nullable=True)
+
+    # Infos port (pour portscan)
+    port = db.Column(db.Integer, nullable=True)
+    protocol = db.Column(db.String(10), default='tcp')
+    state = db.Column(db.String(20), default='open')
+    service = db.Column(db.String(100), nullable=True)
+    banner = db.Column(db.Text, nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<NetworkResult {self.ip}:{self.port}>'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'scan_id': self.scan_id,
+            'ip': self.ip,
+            'hostname': self.hostname,
+            'port': self.port,
+            'protocol': self.protocol,
+            'state': self.state,
+            'service': self.service,
+            'banner': self.banner
+        }
+
+
+# ============================================================================
+# MODELES ACTIVE DIRECTORY
+# ============================================================================
+
+class ADScan(db.Model):
+    """Scan Active Directory"""
+    __tablename__ = 'ad_scans'
+
+    id = db.Column(db.Integer, primary_key=True)
+    investigation_id = db.Column(db.Integer, db.ForeignKey('investigations.id'), nullable=False)
+    started_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+
+    # Cible du scan (DC)
+    target = db.Column(db.String(500), nullable=False)
+    domain = db.Column(db.String(255), nullable=True)
+
+    # Type: basic, full
+    scan_type = db.Column(db.String(50), default='basic')
+
+    # Status: pending, running, completed, failed
+    status = db.Column(db.String(20), default='pending')
+    error_message = db.Column(db.Text, nullable=True)
+
+    # Progress
+    progress_current = db.Column(db.Integer, default=0)
+    progress_total = db.Column(db.Integer, default=0)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime, nullable=True)
+
+    # Relations
+    started_by = db.relationship('User', backref='started_ad_scans')
+    results = db.relationship('ADResult', backref='scan', lazy='dynamic', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<ADScan {self.id} - {self.target}>'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'investigation_id': self.investigation_id,
+            'target': self.target,
+            'domain': self.domain,
+            'scan_type': self.scan_type,
+            'status': self.status,
+            'error_message': self.error_message,
+            'progress_current': self.progress_current,
+            'progress_total': self.progress_total,
+            'started_by': self.started_by.to_dict() if self.started_by else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+            'results_count': self.results.count()
+        }
+
+
+class ADResult(db.Model):
+    """Resultat de scan Active Directory"""
+    __tablename__ = 'ad_results'
+
+    id = db.Column(db.Integer, primary_key=True)
+    scan_id = db.Column(db.Integer, db.ForeignKey('ad_scans.id'), nullable=False)
+
+    # Type: port, ldap_info, user, group, vulnerability, detection, etc.
+    result_type = db.Column(db.String(50), nullable=False)
+
+    # Nom (ex: "Domain Admins", "LDAP Anonymous Bind")
+    name = db.Column(db.String(255), nullable=False)
+
+    # Valeur
+    value = db.Column(db.Text, nullable=True)
+
+    # Severite: critical, high, medium, low, info
+    severity = db.Column(db.String(20), default='info')
+
+    # Port/Service (si applicable)
+    port = db.Column(db.Integer, nullable=True)
+    service = db.Column(db.String(100), nullable=True)
+
+    # Description
+    description = db.Column(db.Text, nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<ADResult {self.result_type}: {self.name}>'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'scan_id': self.scan_id,
+            'result_type': self.result_type,
+            'name': self.name,
+            'value': self.value,
+            'severity': self.severity,
+            'port': self.port,
+            'service': self.service,
+            'description': self.description
         }

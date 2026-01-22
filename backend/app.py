@@ -15,7 +15,8 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False
 
-CORS(app, supports_credentials=True, origins=['http://localhost:5173'])
+# CORS avec credentials
+CORS(app, supports_credentials=True, origins=['http://localhost:5173', 'http://192.168.208.79:5173'])
 
 from models import db, User
 from auth import auth_bp, bcrypt
@@ -24,6 +25,8 @@ from recon import recon_bp
 from enumeration import enum_bp
 from http_tools import http_bp
 from vulns import vulns_bp
+from network import network_bp
+from ad import ad_bp
 
 db.init_app(app)
 bcrypt.init_app(app)
@@ -33,7 +36,7 @@ login_manager.init_app(app)
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 @login_manager.unauthorized_handler
 def unauthorized():
@@ -45,10 +48,12 @@ app.register_blueprint(recon_bp)
 app.register_blueprint(enum_bp)
 app.register_blueprint(http_bp)
 app.register_blueprint(vulns_bp)
+app.register_blueprint(network_bp)
+app.register_blueprint(ad_bp)
 
 @app.route('/api/health', methods=['GET'])
 def health():
     return jsonify({'status': 'ok', 'message': 'Backend Flask est operationnel'})
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5000)

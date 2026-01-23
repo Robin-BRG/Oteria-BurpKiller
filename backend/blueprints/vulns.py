@@ -27,6 +27,20 @@ def start_vuln_scan(inv_id):
 
     data = request.get_json()
     scan_type = data.get('scan_type', 'all')  # sqli, xss, all
+    custom_url = data.get('custom_url')  # URL personnalisee avec parametres
+    cookies_str = data.get('cookies', '')  # Cookies au format "name=value; name2=value2"
+
+    # Parser les cookies
+    cookies = {}
+    if cookies_str:
+        for cookie in cookies_str.split(';'):
+            cookie = cookie.strip()
+            if '=' in cookie:
+                name, value = cookie.split('=', 1)
+                cookies[name.strip()] = value.strip()
+
+    # Utiliser l'URL custom ou l'URL de l'investigation
+    target_url = custom_url if custom_url else investigation.target_url
 
     # Creer le scan
     scan = VulnerabilityScan(
@@ -41,7 +55,7 @@ def start_vuln_scan(inv_id):
     # Lancer le scan en background
     thread = threading.Thread(
         target=run_vuln_scan,
-        args=(scan.id, investigation.target_url)
+        args=(scan.id, target_url, cookies if cookies else None)
     )
     thread.daemon = True
     thread.start()
@@ -49,7 +63,7 @@ def start_vuln_scan(inv_id):
     return jsonify(scan.to_dict()), 201
 
 
-def run_vuln_scan(scan_id, target_url):
+def run_vuln_scan(scan_id, target_url, cookies=None):
     """Execute le scan de vulnerabilites en arriere-plan"""
     from app import app
     with app.app_context():
@@ -60,20 +74,28 @@ def run_vuln_scan(scan_id, target_url):
         try:
             investigation = Investigation.query.get(scan.investigation_id)
 
-            # Recuperer les endpoints depuis la recon
-            recon_results = ReconResult.query.filter_by(
-                scan_id=investigation.scans.first().id if investigation.scans.first() else None
-            ).all()
+            # Si l'URL contient des parametres, scanner directement cette URL
+            from urllib.parse import urlparse
+            parsed = urlparse(target_url)
 
-            endpoints = []
-            for result in recon_results:
-                if result.status_code and 200 <= result.status_code < 300:
-                    full_url = target_url.rstrip('/') + result.path
-                    endpoints.append({'url': full_url, 'method': 'GET'})
-
-            # Si pas d'endpoints, utiliser juste l'URL de base
-            if not endpoints:
+            if parsed.query:
+                # URL avec parametres - scanner directement
                 endpoints = [{'url': target_url, 'method': 'GET'}]
+            else:
+                # Recuperer les endpoints depuis la recon
+                recon_results = ReconResult.query.filter_by(
+                    scan_id=investigation.scans.first().id if investigation.scans.first() else None
+                ).all()
+
+                endpoints = []
+                for result in recon_results:
+                    if result.status_code and 200 <= result.status_code < 300:
+                        full_url = target_url.rstrip('/') + result.path
+                        endpoints.append({'url': full_url, 'method': 'GET'})
+
+                # Si pas d'endpoints, utiliser juste l'URL de base
+                if not endpoints:
+                    endpoints = [{'url': target_url, 'method': 'GET'}]
 
             scan.progress_total = len(endpoints)
             db.session.commit()
@@ -86,7 +108,7 @@ def run_vuln_scan(scan_id, target_url):
                     scan.progress_current = current
                     db.session.commit()
 
-                sqli_vulns = scan_sqli_on_endpoints(endpoints, progress_callback=progress_sqli)
+                sqli_vulns = scan_sqli_on_endpoints(endpoints, progress_callback=progress_sqli, cookies=cookies)
                 all_vulnerabilities.extend(sqli_vulns)
 
             # Scanner XSS
@@ -95,7 +117,7 @@ def run_vuln_scan(scan_id, target_url):
                     scan.progress_current = len(endpoints) + current
                     db.session.commit()
 
-                xss_vulns = scan_xss_on_endpoints(endpoints, progress_callback=progress_xss)
+                xss_vulns = scan_xss_on_endpoints(endpoints, progress_callback=progress_xss, cookies=cookies)
                 all_vulnerabilities.extend(xss_vulns)
 
             # Sauvegarder les vulnerabilites trouvees

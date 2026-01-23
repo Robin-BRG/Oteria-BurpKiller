@@ -667,3 +667,91 @@ pid = start_process('scan', 'Scan de ports', owner='user1')
 # Terminer un processus
 stop_process(pid, status='completed')
 ```
+
+---
+
+## Module Vulnerability Scanner
+
+Les scanners SQLi et XSS permettent de tester des applications web authentifiees.
+
+### Architecture
+
+```
+Frontend (VulnDisplay.tsx)
+    │
+    ├─► URL personnalisee avec parametres GET
+    ├─► Cookies key-value (PHPSESSID, security, etc.)
+    │
+    ▼ POST /api/investigations/:id/vuln-scan
+    │  { scan_type, custom_url, cookies }
+    │
+Backend (vulns.py)
+    │
+    ├─► Parse les cookies (string → dict)
+    ├─► Lance thread en arriere-plan
+    │
+    ▼
+Scripts (sqli_scanner.py, xss_scanner.py)
+    │
+    ├─► parse_qs(url, keep_blank_values=True)
+    ├─► Pour chaque parametre GET:
+    │     └─► Remplace la valeur par les payloads
+    │     └─► Envoie requete avec cookies
+    │     └─► Analyse la reponse
+    └─► Retourne les vulnerabilites detectees
+```
+
+### Fonctionnement du scanner SQLi
+
+1. **Baseline**: Requete normale pour mesurer la taille de reponse
+2. **Injection de payloads**: `'`, `" OR "1"="1`, `UNION SELECT`, etc.
+3. **Detection**:
+   - **Error-based**: Cherche des messages d'erreur SQL (MySQL, PostgreSQL, etc.)
+   - **Boolean-based**: Compare la taille de reponse avec le baseline
+
+### Fonctionnement du scanner XSS
+
+1. **Test de reflection**: Envoie un marqueur unique (`XSS_TEST_MARKER_12345`)
+2. Si reflété → teste les payloads XSS
+3. **Detection**: Cherche le payload non-encode dans la reponse HTML
+
+### Parametres supportes
+
+```python
+# URL avec parametres (obligatoire)
+http://localhost:8080/page.php?id=1&action=view
+
+# Cookies (optionnel, pour authentification)
+cookies = {'PHPSESSID': 'abc123', 'security': 'low'}
+```
+
+### Note importante: `keep_blank_values=True`
+
+Par defaut, `parse_qs()` ignore les parametres avec valeurs vides:
+
+```python
+parse_qs("id=&action=view")
+# → {'action': ['view']}  # 'id' est ignore !
+
+parse_qs("id=&action=view", keep_blank_values=True)
+# → {'id': [''], 'action': ['view']}  # 'id' est conserve
+```
+
+### Types de XSS supportes
+
+| Type | Supporte | Methode |
+|------|----------|---------|
+| Reflected | Oui | Parametres GET |
+| Stored | Non | Necessite POST + relecture |
+| DOM-based | Non | Necessite execution JavaScript |
+
+### Exemple d'utilisation avec DVWA
+
+```bash
+# 1. URL avec parametres
+http://localhost:8080/vulnerabilities/sqli/?id=1&Submit=Submit
+
+# 2. Cookies (recuperes depuis le navigateur)
+PHPSESSID=abc123def456
+security=low
+```

@@ -47,6 +47,10 @@ function VulnDisplay({ investigationId }: VulnDisplayProps) {
   const [loading, setLoading] = useState(false)
   const [scanLoading, setScanLoading] = useState(false)
   const [activeScanId, setActiveScanId] = useState<number | null>(null)
+  const [customUrl, setCustomUrl] = useState('')
+  const [cookiesList, setCookiesList] = useState<{key: string, value: string}[]>([
+    { key: '', value: '' }
+  ])
 
   useEffect(() => {
     loadScans()
@@ -136,14 +140,42 @@ function VulnDisplay({ investigationId }: VulnDisplayProps) {
     }
   }
 
+  const addCookie = () => {
+    setCookiesList([...cookiesList, { key: '', value: '' }])
+  }
+
+  const removeCookie = (index: number) => {
+    if (cookiesList.length > 1) {
+      setCookiesList(cookiesList.filter((_, i) => i !== index))
+    }
+  }
+
+  const updateCookie = (index: number, field: 'key' | 'value', value: string) => {
+    const updated = [...cookiesList]
+    updated[index][field] = value
+    setCookiesList(updated)
+  }
+
+  const buildCookiesString = (): string => {
+    return cookiesList
+      .filter(c => c.key.trim() && c.value.trim())
+      .map(c => `${c.key.trim()}=${c.value.trim()}`)
+      .join('; ')
+  }
+
   const startScan = async (scanType: string) => {
     setScanLoading(true)
+    const cookiesStr = buildCookiesString()
     try {
       const res = await fetch(`http://localhost:5000/api/investigations/${investigationId}/vuln-scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ scan_type: scanType })
+        body: JSON.stringify({
+          scan_type: scanType,
+          custom_url: customUrl || undefined,
+          cookies: cookiesStr || undefined
+        })
       })
 
       if (res.ok) {
@@ -194,6 +226,57 @@ function VulnDisplay({ investigationId }: VulnDisplayProps) {
       {/* Boutons de scan */}
       <div className="scan-controls">
         <h3 className="section-title">Scanners de Vulnerabilites</h3>
+
+        {/* Options avancees */}
+        <div className="scan-options">
+          <div className="option-group">
+            <label htmlFor="custom-url">URL personnalisee (avec parametres)</label>
+            <input
+              id="custom-url"
+              type="text"
+              value={customUrl}
+              onChange={(e) => setCustomUrl(e.target.value)}
+              placeholder="http://localhost:8080/vulnerabilities/sqli/?id=1&Submit=Submit"
+              className="scan-input"
+            />
+          </div>
+          <div className="option-group">
+            <label>Cookies (pour authentification)</label>
+            <div className="cookies-list">
+              {cookiesList.map((cookie, index) => (
+                <div key={index} className="cookie-row">
+                  <input
+                    type="text"
+                    value={cookie.key}
+                    onChange={(e) => updateCookie(index, 'key', e.target.value)}
+                    placeholder="PHPSESSID"
+                    className="scan-input cookie-key"
+                  />
+                  <span className="cookie-separator">=</span>
+                  <input
+                    type="text"
+                    value={cookie.value}
+                    onChange={(e) => updateCookie(index, 'value', e.target.value)}
+                    placeholder="abc123..."
+                    className="scan-input cookie-value"
+                  />
+                  <button
+                    type="button"
+                    className="cookie-remove"
+                    onClick={() => removeCookie(index)}
+                    disabled={cookiesList.length === 1}
+                  >
+                    x
+                  </button>
+                </div>
+              ))}
+              <button type="button" className="cookie-add" onClick={addCookie}>
+                + Ajouter un cookie
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="scan-buttons">
           <button
             className="scan-button sqli"

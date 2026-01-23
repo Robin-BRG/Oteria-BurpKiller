@@ -66,7 +66,13 @@ BurpKiller est une application web collaborative de tests de securite. Elle cent
 
 #### Exploitation
 - Scanner SQL Injection (error-based, boolean-based)
+  - Support URL personnalisee avec parametres GET
+  - Authentification via cookies (PHPSESSID, etc.)
+  - Detection d'erreurs MySQL, PostgreSQL, MSSQL, Oracle, SQLite
 - Scanner XSS (reflected)
+  - Test de reflection de marqueurs uniques
+  - Payloads classiques et bypass de filtres
+  - Support authentification via cookies
 - Detection de secrets JavaScript :
   - Google API Keys
   - AWS Access/Secret Keys
@@ -76,6 +82,8 @@ BurpKiller est une application web collaborative de tests de securite. Elle cent
   - Endpoints API caches
 - Request Builder HTTP (equivalent Burp Repeater)
 - Historique des requetes avec replay
+
+**Note**: Les scanners SQLi et XSS necessitent une URL avec parametres GET (ex: `?id=1&Submit=Submit`). Pour tester des applications authentifiees (DVWA, etc.), renseignez vos cookies de session.
 
 ### Module Reseau
 
@@ -289,6 +297,15 @@ chmod +x dev-tools/*.sh
 - Scanner JS : detecte les secrets exposes dans le JavaScript
 - Request Builder : envoyer des requetes HTTP manuelles
 - Historique HTTP : consulter et rejouer les requetes
+
+**Scanner avec authentification (DVWA, etc.)**:
+1. Connectez-vous a l'application cible dans votre navigateur
+2. Ouvrez les DevTools (F12) > Application > Cookies
+3. Copiez les cookies de session (ex: `PHPSESSID`)
+4. Dans l'onglet Exploitation :
+   - Renseignez l'URL complete avec parametres : `http://localhost:8080/vulnerabilities/sqli/?id=1&Submit=Submit`
+   - Ajoutez vos cookies via l'interface key-value
+5. Lancez le scan SQLi ou XSS
 
 #### Onglet Terminal
 - Executer du code Python directement dans le navigateur

@@ -1,41 +1,33 @@
 #!/bin/bash
-# Script de démarrage complet pour Oteria-BurpKiller sur Linux/Debian
 
-echo "=== Démarrage d'Oteria-BurpKiller ==="
-echo ""
+# Script de lancement global pour Linux/Mac
 
-# Aller au répertoire du projet
-cd "$(dirname "$0")"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEV_TOOLS="$PROJECT_ROOT/dev-tools"
 
-# Démarrer le backend en arrière-plan
-echo "[1/2] Démarrage du backend Flask..."
-./start-backend.sh > backend.log 2>&1 &
-BACKEND_PID=$!
-echo "Backend démarré (PID: $BACKEND_PID)"
+# Fonction pour tuer les processus fils à la sortie
+cleanup() {
+    echo ""
+    echo "🔴 Arrêt des services Oteria BurpKiller..."
+    kill $(jobs -p) 2>/dev/null
+    exit
+}
+
+# Intercepter Ctrl+C (SIGINT) et SIGTERM
+trap cleanup SIGINT SIGTERM
+
+echo "🚀 Lancement de Oteria BurpKiller (Linux/Mac)"
+echo "=============================================="
+
+# Rendre les scripts exécutables (au cas où)
+chmod +x "$DEV_TOOLS/start-backend.sh"
+chmod +x "$DEV_TOOLS/start-frontend.sh"
+
+# Lancer le backend en arrière-plan
+"$DEV_TOOLS/start-backend.sh" &
+
+# Attendre un peu que le backend s'initialise
 sleep 2
 
-# Démarrer le frontend en arrière-plan
-echo "[2/2] Démarrage du frontend Vite..."
-./start-frontend.sh > frontend.log 2>&1 &
-FRONTEND_PID=$!
-echo "Frontend démarré (PID: $FRONTEND_PID)"
-
-echo ""
-echo "=== Application lancée avec succès! ==="
-echo ""
-echo "Backend:  http://127.0.0.1:5000"
-echo "Frontend: http://localhost:5173"
-echo ""
-echo "Pour arrêter l'application:"
-echo "  kill $BACKEND_PID $FRONTEND_PID"
-echo ""
-echo "Logs:"
-echo "  Backend:  tail -f backend.log"
-echo "  Frontend: tail -f frontend.log"
-echo ""
-
-# Sauvegarder les PIDs
-echo $BACKEND_PID > .backend.pid
-echo $FRONTEND_PID > .frontend.pid
-
-echo "PIDs sauvegardés dans .backend.pid et .frontend.pid"
+# Lancer le frontend (garde le terminal actif)
+"$DEV_TOOLS/start-frontend.sh"

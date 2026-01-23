@@ -1,18 +1,16 @@
 #!/bin/bash
-# Script de démarrage du frontend Vite pour Linux/Debian
 
-cd "$(dirname "$0")/frontend"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+FRONTEND_DIR="$PROJECT_ROOT/frontend"
 
-# Charger nvm
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+echo "🟢 [Frontend] Démarrage..."
+cd "$FRONTEND_DIR"
 
-# Vérifier que Node.js est installé
-if ! command -v node &> /dev/null; then
-    echo "Erreur: Node.js n'est pas installé. Installez-le avec nvm."
-    exit 1
+# Vérification des node_modules
+if [ ! -d "node_modules" ]; then
+    echo "⚠️  [Frontend] Dépendances Node non trouvées. Installation..."
+    npm install
 fi
 
-# Lancer le serveur Vite
-echo "Démarrage du serveur Vite sur http://0.0.0.0:5173"
-npm run dev -- --host 0.0.0.0
+echo "🚀 [Frontend] Lancement de Vite sur http://localhost:5173"
+npm run dev

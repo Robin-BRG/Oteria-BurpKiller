@@ -1,18 +1,23 @@
 #!/bin/bash
-# Script de démarrage du backend Flask pour Linux/Debian
 
-cd "$(dirname "$0")/backend"
+# Récupérer le chemin absolu du dossier racine du projet
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BACKEND_DIR="$PROJECT_ROOT/backend"
 
-# Activer l'environnement virtuel
-if [ -f "../venv/bin/activate" ]; then
-    source ../venv/bin/activate
-elif [ -f "~/Documents/venv/bin/activate" ]; then
-    source ~/Documents/venv/bin/activate
+echo "🔵 [Backend] Démarrage..."
+cd "$BACKEND_DIR"
+
+# Vérification/Création du venv
+if [ ! -d "venv" ]; then
+    echo "⚠️  [Backend] Environnement virtuel non trouvé. Création..."
+    python3 -m venv venv
+    source venv/bin/activate
+    echo "📦 [Backend] Installation des dépendances..."
+    pip install -r requirements.txt
 else
-    echo "Erreur: Environnement virtuel non trouvé"
-    exit 1
+    source venv/bin/activate
 fi
 
-# Lancer le serveur Flask
-echo "Démarrage du serveur Flask sur http://127.0.0.1:5000"
+# Lancement de Flask
+echo "🚀 [Backend] Lancement du serveur Flask sur http://localhost:5000"
 python app.py

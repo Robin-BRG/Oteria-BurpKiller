@@ -5,7 +5,6 @@ Module Reports - Génération de rapports PDF et HTML
 from flask import Blueprint, request, jsonify, send_file
 from flask_login import login_required, current_user
 from models import db, Investigation
-from .report_generator import generate_html_report, generate_pdf_report
 from datetime import datetime
 import io
 
@@ -22,6 +21,7 @@ def get_html_report(inv_id):
         return jsonify({'error': 'Non autorisé'}), 403
 
     try:
+        from .report_generator import generate_html_report
         html_content = generate_html_report(investigation, current_user)
 
         # Retourner le HTML directement
@@ -41,6 +41,7 @@ def get_pdf_report(inv_id):
         return jsonify({'error': 'Non autorisé'}), 403
 
     try:
+        from .report_generator import generate_pdf_report
         pdf_content = generate_pdf_report(investigation, current_user)
 
         # Créer un nom de fichier

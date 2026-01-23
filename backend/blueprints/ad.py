@@ -572,14 +572,65 @@ def check_null_session(target, timeout=5):
 
 def enumerate_users_rpc(target, timeout=10):
     """Enumeration des utilisateurs via RPC (si autorise)"""
-    # Cette fonction necessite impacket pour fonctionner correctement
-    # Pour l'instant, on retourne une liste vide avec un message
-    return [{
-        'type': 'info',
-        'name': 'RPC Enumeration',
-        'value': 'Requires impacket library for full RPC enumeration',
-        'severity': 'info'
-    }]
+    results = []
+    try:
+        from impacket.dcerpc.v5 import transport, samr
+        from impacket.dcerpc.v5.dtypes import NULL
+
+        # Tenter une connexion anonyme (Null Session) sur le pipe SAMR
+        binding = r'ncacn_np:%s[\pipe\samr]' % target
+        rpctransport = transport.DCERPCTransportFactory(binding)
+        rpctransport.set_connect_timeout(timeout)
+
+        try:
+            dce = rpctransport.get_dce_rpc()
+            dce.connect()
+            dce.bind(samr.MSRPC_UUID_SAMR)
+            
+            # Connexion (Anonyme/Null Session)
+            resp = samr.hSamrConnect2(dce)
+            serverHandle = resp['ServerHandle']
+
+            # Enumerer les domaines
+            resp = samr.hSamrEnumerateDomainsInSamServer(dce, serverHandle)
+            domains = resp['Buffer']['Buffer']
+
+            for domain in domains:
+                domainName = domain['Name']
+                results.append({
+                    'type': 'ad_info',
+                    'name': 'RPC Domain',
+                    'value': domainName,
+                    'severity': 'info'
+                })
+
+                # Lookup Domain SID
+                resp = samr.hSamrLookupDomainInSamServer(dce, serverHandle, domainName)
+                domainId = resp['DomainId']
+
+                # Ouvrir le domaine
+                resp = samr.hSamrOpenDomain(dce, serverHandle, domainId=domainId)
+                domainHandle = resp['DomainHandle']
+
+                # Enumerer les utilisateurs
+                resp = samr.hSamrEnumerateUsersInDomain(dce, domainHandle)
+                for user in resp['Buffer']['Buffer']:
+                    results.append({
+                        'type': 'user',
+                        'name': user['Name'],
+                        'value': f"RID: {user['RelativeId']}",
+                        'severity': 'info'
+                    })
+
+        except Exception:
+            pass  # Echec de connexion ou acces refuse (normal si securise)
+
+    except ImportError:
+        pass
+    except Exception:
+        pass
+
+    return results
 
 
 def check_kerberos(target, timeout=5):
@@ -623,7 +674,7 @@ def scan_ad(target, scan_type='basic', progress_callback=None):
         Liste de resultats avec analyse de vulnerabilites
     """
     all_results = []
-    steps = 7 if scan_type == 'full' else 3
+    steps = 8 if scan_type == 'full' else 3
     current = 0
 
     # Etape 1: Scan des ports AD
@@ -687,7 +738,16 @@ def scan_ad(target, scan_type='basic', progress_callback=None):
             krb_results = check_kerberos(target)
             all_results.extend(krb_results)
 
-        # Etape 7: Analyse des vulnerabilites
+        # Etape 7: Enumeration RPC (Users/Groups)
+        if progress_callback:
+            progress_callback(current, steps)
+        current += 1
+
+        if any(p['port'] == 445 for p in ports):
+            rpc_results = enumerate_users_rpc(target)
+            all_results.extend(rpc_results)
+
+        # Etape 8: Analyse des vulnerabilites
         if progress_callback:
             progress_callback(current, steps)
         current += 1

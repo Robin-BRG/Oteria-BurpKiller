@@ -33,8 +33,34 @@ export default function ReportGenerator({ investigationId, investigationName }: 
     }
   };
 
-  const generateHTML = () => {
-    window.open(`http://localhost:5000/api/investigations/${investigationId}/report/html`, '_blank');
+  const generateHTML = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch(`http://localhost:5000/api/investigations/${investigationId}/report/html`, {
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la génération du HTML');
+      }
+
+      // Créer un blob et télécharger le fichier
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `rapport_${investigationName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.html`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const generatePDF = async () => {
@@ -96,7 +122,7 @@ export default function ReportGenerator({ investigationId, investigationName }: 
           disabled={loading}
           className="btn btn-primary"
         >
-          Générer HTML
+          {loading ? 'Génération...' : 'Télécharger HTML'}
         </button>
 
         <button

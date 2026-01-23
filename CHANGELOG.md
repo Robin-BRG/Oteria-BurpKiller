@@ -134,6 +134,46 @@ logger.info('Operation successful')
 
 ---
 
+#### 4. Corrections et Améliorations
+
+**Commits**: `62fb679`, `f290fe0` - Bug fixes et améliorations UX
+
+- 🐛 **Correction génération de rapports**
+  - Fix: Attribut `response_time` inexistant dans ReconResult
+  - Fix: Attribut `severity` inexistant dans EnumResult
+  - Alignement du template HTML avec les modèles de données actuels
+  - Test: Génération HTML fonctionne parfaitement (22 KB générés)
+
+- 💬 **Amélioration messages d'erreur PDF**
+  - Messages plus clairs pour limitation Windows/GTK+
+  - Suggestion de workaround: "Générer HTML puis Imprimer > PDF"
+  - Meilleure UX pour utilisateurs Windows
+
+- 📥 **Téléchargement direct HTML**
+  - Fonction `generateHTML()` transformée en async/await
+  - Téléchargement automatique du fichier HTML (au lieu d'ouverture navigateur)
+  - Nom de fichier formaté: `rapport_[nom]_[date].html`
+  - Comportement cohérent avec le bouton PDF
+  - Indicateur de chargement pendant génération
+
+- 🧹 **Nettoyage et réorganisation du code**
+  - `.gitignore` amélioré (logs, tests, instance, uploads)
+  - Suppression 9 fichiers d'apprentissage Python (boucles.py, calculs.py, etc.)
+  - Structure projet clarifiée et professionnalisée
+
+- 📁 **Réorganisation de l'arborescence (structure professionnelle)**
+  - `backend/blueprints/` → Tous les blueprints Flask (10 fichiers)
+  - `backend/scripts/` → Organisé en sous-dossiers `recon/`, `enum/`, `exploit/`
+  - `backend/config/` → Fichiers de configuration (pytest.ini, .coveragerc)
+  - `backend/utils/` → Scripts utilitaires (init_db.py)
+  - `backend/tests/` → Tous les tests regroupés (7 fichiers)
+  - `dev-tools/` → Scripts shell de développement (6 fichiers)
+  - Racine backend: Seulement app.py, models.py, logger_config.py (convention Flask)
+  - Imports mis à jour dans app.py, recon.py, enumeration.py, vulns.py
+  - READMEs ajoutés dans 5 dossiers (scripts/, config/, utils/, dev-tools/, blueprints/)
+
+---
+
 ### 📈 Impact sur la qualité du projet
 
 #### Avant cette branche

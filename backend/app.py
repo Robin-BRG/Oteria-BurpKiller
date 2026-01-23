@@ -57,15 +57,15 @@ def log_response(response):
     return response
 
 from models import db, User
-from auth import auth_bp, bcrypt
-from investigations import investigations_bp
-from recon import recon_bp
-from enumeration import enum_bp
-from http_tools import http_bp
-from vulns import vulns_bp
-from network import network_bp
-from ad import ad_bp
-from reports import reports_bp
+from blueprints.auth import auth_bp, bcrypt
+from blueprints.investigations import investigations_bp
+from blueprints.recon import recon_bp
+from blueprints.enumeration import enum_bp
+from blueprints.http_tools import http_bp
+from blueprints.vulns import vulns_bp
+from blueprints.network import network_bp
+from blueprints.ad import ad_bp
+from blueprints.reports import reports_bp
 
 db.init_app(app)
 bcrypt.init_app(app)

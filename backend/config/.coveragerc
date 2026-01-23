@@ -1,9 +1,11 @@
 [run]
-source = .
+source = ..
 omit =
     */venv/*
     */tests/*
     */scripts/*
+    */config/*
+    */utils/*
     test_*.py
     conftest.py
     setup.py
@@ -19,4 +21,4 @@ exclude_lines =
     @abstractmethod
 
 [html]
-directory = htmlcov
+directory = ../htmlcov

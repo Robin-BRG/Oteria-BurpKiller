@@ -172,6 +172,8 @@ pip install -r requirements.txt
 Initialiser la base de donnees :
 
 ```bash
+python utils/init_db.py
+# ou
 python -c "from app import app, db; app.app_context().push(); db.create_all()"
 ```
 
@@ -189,13 +191,13 @@ Lancer les tests :
 
 ```bash
 cd backend
-pytest tests/ -v
+pytest -c config/pytest.ini
 ```
 
 Avec couverture de code :
 
 ```bash
-pytest tests/ --cov=. --cov-report=html
+pytest -c config/pytest.ini --cov
 ```
 
 Statistiques actuelles :
@@ -203,7 +205,7 @@ Statistiques actuelles :
 - 48 tests qui passent (90%)
 - 51% de couverture de code
 
-Voir [backend/tests/README.md](backend/tests/README.md) pour plus de détails.
+Voir [backend/tests/README.md](backend/tests/README.md) et [backend/config/README.md](backend/config/README.md) pour plus de détails.
 
 ### Installation du frontend
 
@@ -219,13 +221,13 @@ Le frontend est accessible sur http://localhost:5173
 
 **Windows (PowerShell)**
 ```powershell
-.\start-dev.ps1
+.\dev-tools\start-dev.ps1
 ```
 
 **Linux/Mac**
 ```bash
-chmod +x start-dev.sh
-./start-dev.sh
+chmod +x dev-tools/*.sh
+./dev-tools/start-dev.sh
 ```
 
 ---
@@ -387,24 +389,45 @@ Oteria-BurpKiller/
 |-- backend/
 |   |-- app.py                    # Point d'entree Flask
 |   |-- models.py                 # Modeles SQLAlchemy (14 tables)
-|   |-- auth.py                   # Blueprint authentification
-|   |-- investigations.py         # Blueprint investigations
-|   |-- recon.py                  # Blueprint reconnaissance web
-|   |-- enumeration.py            # Blueprint enumeration
-|   |-- network.py                # Blueprint scan reseau
-|   |-- ad.py                     # Blueprint Active Directory
-|   |-- vulns.py                  # Blueprint vulnerabilites
-|   |-- http_tools.py             # Blueprint HTTP tools
-|   |-- reports.py                # Blueprint reporting
-|   |-- report_generator.py       # Generateur de rapports HTML/PDF
+|   |-- logger_config.py          # Configuration logging centralise
 |   |-- requirements.txt          # Dependances Python
 |   |
-|   |-- scripts/
-|   |   |-- http_scanner.py       # Scanner de paths HTTP
-|   |   |-- tech_detector.py      # Detection de technologies
-|   |   |-- sqli_scanner.py       # Scanner SQL Injection
-|   |   |-- xss_scanner.py        # Scanner XSS
-|   |   |-- js_secret_scanner.py  # Scanner secrets JavaScript
+|   |-- blueprints/               # Blueprints Flask (routes API)
+|   |   |-- auth.py               # Authentification
+|   |   |-- investigations.py    # Gestion investigations
+|   |   |-- recon.py              # Reconnaissance web
+|   |   |-- enumeration.py        # Enumeration technologies
+|   |   |-- network.py            # Scan reseau
+|   |   |-- ad.py                 # Active Directory
+|   |   |-- vulns.py              # Vulnerabilites
+|   |   |-- http_tools.py         # Request Builder
+|   |   |-- reports.py            # Generation rapports
+|   |   |-- report_generator.py   # Moteur de rapports
+|   |
+|   |-- config/                   # Configuration tests et coverage
+|   |   |-- pytest.ini            # Config pytest
+|   |   |-- .coveragerc           # Config coverage
+|   |
+|   |-- utils/                    # Scripts utilitaires
+|   |   |-- init_db.py            # Initialisation base de donnees
+|   |
+|   |-- scripts/                  # Scripts organises par categorie
+|   |   |-- recon/
+|   |   |   |-- http_scanner.py   # Scanner de paths HTTP
+|   |   |-- enum/
+|   |   |   |-- tech_detector.py  # Detection de technologies
+|   |   |-- exploit/
+|   |       |-- sqli_scanner.py   # Scanner SQL Injection
+|   |       |-- xss_scanner.py    # Scanner XSS
+|   |       |-- js_secret_scanner.py  # Scanner secrets JavaScript
+|   |
+|   |-- tests/                    # Suite de tests pytest
+|   |   |-- conftest.py           # Fixtures pytest
+|   |   |-- test_auth.py          # Tests authentification
+|   |   |-- test_models.py        # Tests modeles
+|   |   |-- test_investigations.py # Tests investigations
+|   |   |-- test_network.py       # Tests scan reseau
+|   |   |-- test_reports.py       # Tests reporting
 |   |
 |   |-- instance/
 |       |-- app.db                # Base de donnees SQLite
@@ -437,9 +460,16 @@ Oteria-BurpKiller/
 |   |-- package.json
 |   |-- vite.config.ts
 |
-|-- start-dev.ps1                 # Script demarrage Windows
-|-- start-dev.sh                  # Script demarrage Linux/Mac
+|-- dev-tools/                    # Scripts de developpement
+|   |-- start-dev.ps1             # Demarrage complet (Windows)
+|   |-- start-dev.sh              # Demarrage complet (Linux/Mac)
+|   |-- start-backend.ps1         # Backend seul (Windows)
+|   |-- start-backend.sh          # Backend seul (Linux/Mac)
+|   |-- start-frontend.ps1        # Frontend seul (Windows)
+|   |-- start-frontend.sh         # Frontend seul (Linux/Mac)
+|
 |-- README.md                     # Documentation
+|-- CHANGELOG.md                  # Historique des modifications
 ```
 
 ---

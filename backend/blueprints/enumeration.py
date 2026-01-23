@@ -9,7 +9,7 @@ import os
 
 enum_bp = Blueprint('enumeration', __name__)
 
-SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), 'scripts')
+SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), 'scripts', 'enum')
 sys.path.insert(0, SCRIPTS_DIR)
 
 from tech_detector import analyze_headers

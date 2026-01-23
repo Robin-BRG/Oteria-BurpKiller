@@ -7,477 +7,537 @@ Ce document decrit l'architecture interne du projet, les fichiers cles et le fon
 ## Architecture Generale
 
 ```
-Frontend (React)          Backend (Flask)           Base de donnees
-    |                          |                         |
-    |   -- API REST -->        |                         |
-    |   <-- JSON --            |   -- SQLAlchemy -->     |
-    |                          |                         |
-Port 5173                  Port 5000                  SQLite
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│    Frontend     │     │     Backend     │     │   Base donnees  │
+│     (React)     │────▶│     (Flask)     │────▶│    (SQLite)     │
+│   Port 5173     │◀────│    Port 5000    │◀────│                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+        │                       │
+        │                       ▼
+        │               ┌─────────────────┐
+        │               │    Scripts      │
+        │               │    (Python)     │
+        │               └─────────────────┘
+        │
+        ▼
+   Navigateur Web
 ```
 
 ---
 
-## Backend (Python/Flask)
+## Structure des fichiers
 
-### Point d'entree
+```
+backend/
+├── app.py                    # Point d'entree Flask
+├── models.py                 # Modeles SQLAlchemy
+├── logger_config.py          # Configuration logging
+│
+├── blueprints/               # Modules API (routes)
+│   ├── __init__.py
+│   ├── auth.py               # Authentification
+│   ├── investigations.py     # CRUD investigations
+│   ├── recon.py              # Scan HTTP paths
+│   ├── enumeration.py        # Detection technologies
+│   ├── network.py            # Scan ports reseau
+│   ├── ad.py                 # Enumeration Active Directory
+│   ├── vulns.py              # Scan vulnerabilites
+│   ├── http_tools.py         # Request builder
+│   ├── reports.py            # Generation rapports
+│   └── report_generator.py   # Logique generation PDF/HTML
+│
+├── scripts/                  # Scripts Python "purs"
+│   ├── recon/
+│   │   └── http_scanner.py   # Scanner de paths HTTP
+│   ├── enum/
+│   │   └── tech_detector.py  # Detection technologies
+│   └── exploit/
+│       ├── sqli_scanner.py   # Scanner SQLi
+│       ├── xss_scanner.py    # Scanner XSS
+│       └── js_secret_scanner.py
+│
+├── tests/                    # Tests unitaires
+│   ├── conftest.py           # Fixtures pytest
+│   ├── test_auth.py
+│   ├── test_investigations.py
+│   ├── test_network.py
+│   └── test_reports.py
+│
+└── instance/
+    └── app.db                # Base SQLite
 
-**Fichier: `backend/app.py`**
+frontend/
+├── src/
+│   ├── App.tsx               # Routeur principal
+│   ├── main.tsx              # Point d'entree
+│   ├── index.css             # Variables CSS globales
+│   │
+│   ├── context/
+│   │   └── AuthContext.tsx   # Context authentification
+│   │
+│   ├── pages/
+│   │   ├── Home.tsx
+│   │   ├── Login.tsx
+│   │   ├── Register.tsx
+│   │   ├── Investigation.tsx # Page principale (onglets)
+│   │   └── InvestigationsList.tsx
+│   │
+│   └── components/
+│       ├── NetworkDisplay.tsx/.css
+│       ├── ADDisplay.tsx/.css
+│       ├── ReconGraph.tsx/.css
+│       ├── EnumDisplay.tsx/.css
+│       ├── VulnDisplay.tsx/.css
+│       ├── RequestBuilder.tsx/.css
+│       └── ReportGenerator.tsx/.css
+│
+└── vite.config.ts            # Config Vite (proxy API)
+```
 
-- Initialisation de l'application Flask
-- Configuration CORS et sessions
-- Enregistrement des Blueprints (modules)
-- Gestion du user loader pour Flask-Login
-- Creation des tables au demarrage
+---
+
+## Comment les scripts Python sont charges
+
+### Mecanisme d'import dynamique
+
+Les scripts dans `scripts/` sont des modules Python independants.
+Les blueprints les chargent via manipulation du `sys.path`:
+
+**Fichier: `blueprints/recon.py` (lignes 12-15)**
 
 ```python
-# Blueprints enregistres
-app.register_blueprint(auth_bp)           # /api/register, /api/login, etc.
-app.register_blueprint(investigations_bp) # /api/investigations
-app.register_blueprint(recon_bp)          # /api/investigations/:id/scans
-app.register_blueprint(enum_bp)           # /api/investigations/:id/enum
-app.register_blueprint(vulns_bp)          # /api/investigations/:id/vuln-scan
-app.register_blueprint(http_tools_bp)     # /api/investigations/:id/http-requests
-app.register_blueprint(network_bp)        # /api/investigations/:id/network-scans
-app.register_blueprint(ad_bp)             # /api/investigations/:id/ad-scans
+import sys
+import os
+
+# 1. Calcule le chemin absolu vers scripts/recon/
+SCRIPTS_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)),  # backend/
+    'scripts',
+    'recon'
+)
+
+# 2. Ajoute au PYTHONPATH
+sys.path.insert(0, SCRIPTS_DIR)
+
+# 3. Importe les fonctions
+from http_scanner import scan_http, COMMON_PATHS
+```
+
+### Pourquoi cette architecture ?
+
+1. **Scripts executables independamment**:
+   ```bash
+   cd backend/scripts/recon
+   python http_scanner.py https://example.com
+   ```
+
+2. **Pas de dependance Flask** dans les scripts
+3. **Facile a tester** unitairement
+4. **Reutilisable** dans d'autres projets
+
+---
+
+## Flux d'execution complet
+
+### Exemple: Lancement d'un scan de reconnaissance
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│  ETAPE 1: Frontend envoie la requete                                    │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  NetworkDisplay.tsx:                                                    │
+│  const startScan = async () => {                                       │
+│    const response = await fetch(                                       │
+│      '/api/investigations/1/network-scans',                            │
+│      {                                                                  │
+│        method: 'POST',                                                  │
+│        body: JSON.stringify({                                          │
+│          target: '192.168.1.1',                                        │
+│          scan_type: 'quick'                                            │
+│        })                                                               │
+│      }                                                                  │
+│    );                                                                   │
+│    const scan = await response.json();                                 │
+│    setActiveScan(scan);  // { id: 1, status: 'running' }               │
+│  }                                                                      │
+│                                                                         │
+└────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│  ETAPE 2: Backend recoit et lance le thread                            │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  blueprints/network.py:                                                │
+│                                                                         │
+│  @network_bp.route('/api/.../network-scans', methods=['POST'])         │
+│  @login_required                                                        │
+│  def start_network_scan(inv_id):                                       │
+│      # 1. Cree l'entree en base                                        │
+│      scan = NetworkScan(                                               │
+│          target=data['target'],                                        │
+│          status='running'                                              │
+│      )                                                                  │
+│      db.session.add(scan)                                              │
+│      db.session.commit()                                               │
+│                                                                         │
+│      # 2. Lance le thread en arriere-plan                              │
+│      thread = threading.Thread(                                        │
+│          target=run_network_scan,                                      │
+│          args=(app._get_current_object(), scan.id, ...)                │
+│      )                                                                  │
+│      thread.daemon = True                                              │
+│      thread.start()                                                    │
+│                                                                         │
+│      # 3. Retourne IMMEDIATEMENT (non-bloquant)                        │
+│      return jsonify(scan.to_dict()), 201                               │
+│                                                                         │
+└────────────────────────────────────────────────────────────────────────┘
+                                    │
+              ┌─────────────────────┴─────────────────────┐
+              │                                           │
+              ▼                                           ▼
+┌─────────────────────────────┐         ┌─────────────────────────────────┐
+│  THREAD PRINCIPAL           │         │  THREAD ARRIERE-PLAN             │
+│  (Continue a repondre)      │         │  (Execute le scan)               │
+├─────────────────────────────┤         ├─────────────────────────────────┤
+│                             │         │                                  │
+│  Retourne au frontend:      │         │  def run_network_scan(app, ...): │
+│  { id: 1, status: running } │         │      with app.app_context():     │
+│                             │         │          # Scan les ports        │
+│                             │         │          for port in PORTS:      │
+│                             │         │              if is_open(ip, port):│
+│                             │         │                  save_result()   │
+│                             │         │                                  │
+│                             │         │          scan.status = 'completed'│
+│                             │         │          db.session.commit()     │
+│                             │         │                                  │
+└─────────────────────────────┘         └─────────────────────────────────┘
+              │                                           │
+              ▼                                           │
+┌─────────────────────────────┐                           │
+│  ETAPE 3: Frontend poll     │                           │
+├─────────────────────────────┤                           │
+│                             │                           │
+│  useEffect(() => {          │                           │
+│    if (activeScan) {        │                           │
+│      setInterval(() => {    │◀──────────────────────────┘
+│        checkStatus()        │    Quand termine, le frontend
+│      }, 2000)               │    detecte status='completed'
+│    }                        │
+│  })                         │
+│                             │
+└─────────────────────────────┘
 ```
 
 ---
 
-### Modeles de donnees
+## Le contexte Flask dans les threads
 
-**Fichier: `backend/models.py`**
+### Probleme
 
-| Modele | Description | Relations |
-|--------|-------------|-----------|
-| `User` | Utilisateur avec authentification | owns investigations, memberships |
-| `Investigation` | Enquete/projet de pentest | owner, members, scans |
-| `InvestigationMember` | Relation N:M user-investigation | user_id, investigation_id, role |
-| `InvestigationFile` | Fichiers uploades | investigation_id |
-| `ReconScan` | Scan de reconnaissance HTTP | investigation_id, results |
-| `ReconResult` | Resultat d'un path trouve | scan_id |
-| `EnumScan` | Scan d'enumeration tech | investigation_id |
-| `EnumResult` | Technologies detectees | scan_id |
-| `NetworkScan` | Scan de ports reseau | investigation_id |
-| `NetworkResult` | Port ouvert trouve | scan_id |
-| `ADScan` | Scan Active Directory | investigation_id |
-| `ADResult` | Resultat AD (service, vuln) | scan_id |
-| `VulnerabilityScan` | Scan SQLi/XSS | investigation_id |
-| `Vulnerability` | Vulnerabilite trouvee | scan_id |
-| `HttpRequest` | Requete HTTP enregistree | investigation_id |
-| `JsSecret` | Secret JS detecte | investigation_id |
+Flask utilise un "contexte d'application" pour acceder a `db`, `current_user`, etc.
+Ce contexte n'existe que dans le thread principal.
 
-#### Methodes importantes des modeles
+### Solution
+
+Chaque thread doit creer son propre contexte:
 
 ```python
-# User
-user.check_password(password)  # Verification bcrypt
+def run_scan_task(scan_id, target_url):
+    from app import app  # Import ici, pas en haut du fichier
 
-# Investigation
-investigation.user_can_view(user)   # Peut voir (owner, member, public)
-investigation.user_can_edit(user)   # Peut editer (owner, editor role)
-investigation.to_dict()             # Serialisation JSON
+    with app.app_context():  # Cree le contexte pour ce thread
+        scan = db.session.get(NetworkScan, scan_id)
+
+        # Maintenant on peut utiliser db.session
+        results = do_scan(target_url)
+
+        for result in results:
+            db.session.add(NetworkResult(...))
+
+        scan.status = 'completed'
+        db.session.commit()
 ```
+
+**Pourquoi `from app import app` dans la fonction ?**
+
+Pour eviter les imports circulaires:
+- `app.py` importe `blueprints/network.py`
+- `network.py` ne peut pas importer `app` au niveau module
 
 ---
 
-### Modules Backend
+## Routes API principales
 
-#### 1. Authentification (`backend/auth.py`)
+### Authentification (`/api/auth`)
 
-| Route | Methode | Fonction |
-|-------|---------|----------|
-| `/api/register` | POST | Creer un compte |
-| `/api/login` | POST | Connexion (session) |
+| Route | Methode | Description |
+|-------|---------|-------------|
+| `/api/register` | POST | Creer compte |
+| `/api/login` | POST | Connexion |
 | `/api/logout` | POST | Deconnexion |
-| `/api/check-auth` | GET | Verifier si connecte |
-| `/api/me` | GET | Infos utilisateur courant |
+| `/api/check-auth` | GET | Verifier session |
+| `/api/me` | GET | Info utilisateur |
 
-**Securite:**
-- Mots de passe hashes avec bcrypt
-- Sessions Flask-Login
-- Decorator `@login_required` sur routes protegees
+### Investigations (`/api/investigations`)
+
+| Route | Methode | Description |
+|-------|---------|-------------|
+| `/api/investigations` | GET | Liste |
+| `/api/investigations` | POST | Creer |
+| `/api/investigations/:id` | GET | Details |
+| `/api/investigations/:id` | PUT | Modifier |
+| `/api/investigations/:id` | DELETE | Supprimer |
+
+### Scans (par investigation)
+
+| Route | Description |
+|-------|-------------|
+| `POST /api/investigations/:id/scans` | Lance scan HTTP |
+| `POST /api/investigations/:id/network-scans` | Lance scan ports |
+| `POST /api/investigations/:id/ad-scans` | Lance scan AD |
+| `POST /api/investigations/:id/enum` | Lance enumeration |
+| `POST /api/investigations/:id/vuln-scan` | Lance scan vulns |
+
+### Resultats
+
+| Route | Description |
+|-------|-------------|
+| `GET /api/scans/:id` | Statut d'un scan |
+| `GET /api/scans/:id/results` | Resultats d'un scan |
+| `GET /api/network-scans/:id/results` | Resultats scan reseau |
 
 ---
 
-#### 2. Investigations (`backend/investigations.py`)
+## Modeles de donnees
 
-| Route | Methode | Fonction |
-|-------|---------|----------|
-| `/api/investigations` | GET | Liste investigations accessibles |
-| `/api/investigations` | POST | Creer investigation |
-| `/api/investigations/:id` | GET | Details investigation |
-| `/api/investigations/:id` | PUT | Modifier investigation |
-| `/api/investigations/:id` | DELETE | Supprimer investigation |
-| `/api/investigations/:id/members` | POST | Ajouter membre |
-| `/api/investigations/:id/members` | GET | Lister membres |
-| `/api/investigations/:id/files` | POST | Upload fichier |
-| `/api/investigations/:id/files` | GET | Lister fichiers |
+### Relations
 
----
+```
+User (1) ───────────────┐
+  │                     │
+  │ owns                │ member_of
+  ▼                     ▼
+Investigation ◀─── InvestigationMember
+  │
+  │ has_many
+  ▼
+┌─────────────────────────────────────┐
+│  ReconScan      → ReconResult       │
+│  EnumScan       → EnumResult        │
+│  NetworkScan    → NetworkResult     │
+│  ADScan         → ADResult          │
+│  VulnerabilityScan → Vulnerability  │
+│  HttpRequest                        │
+│  JsSecret                           │
+└─────────────────────────────────────┘
+```
 
-#### 3. Reconnaissance Web (`backend/recon.py`)
+### Serialisation JSON
 
-**Fonctionnement:**
-1. Cree un `ReconScan` en base
-2. Lance un thread en arriere-plan
-3. Le thread appelle `http_scanner.scan_paths()`
-4. Sauvegarde les `ReconResult` trouves
-5. Met a jour le statut du scan
-
-**Fichier scanner: `backend/scripts/http_scanner.py`**
+Chaque modele a une methode `to_dict()`:
 
 ```python
-def scan_paths(base_url, wordlist, mode='normal', callback=None):
-    # Modes: stealth (1 req/s), normal (5 req/s), aggressive (20 req/s)
-    # Retourne liste de paths trouves avec status codes
+class NetworkScan(db.Model):
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'target': self.target,
+            'status': self.status,
+            'progress_current': self.progress_current,
+            'progress_total': self.progress_total,
+            'results_count': self.results.count(),
+            'created_at': self.created_at.isoformat(),
+            ...
+        }
 ```
 
 ---
 
-#### 4. Enumeration (`backend/enumeration.py`)
+## Frontend: Communication avec l'API
 
-**Fonctionnement:**
-1. Analyse les headers HTTP de la cible
-2. Detecte les technologies (serveur, framework, CMS)
-3. Evalue la securite des headers
-
-**Fichier scanner: `backend/scripts/tech_detector.py`**
-
-```python
-def detect_technologies(url):
-    # Detecte: Server, X-Powered-By, frameworks JS, CMS
-    # Retourne dict avec technologies et headers securite
-```
-
----
-
-#### 5. Scan Reseau (`backend/network.py`)
-
-**Fonctionnement:**
-1. Resout la cible (hostname -> IP)
-2. Scanne les ports TCP avec sockets
-3. Recupere les bannieres des services
-4. Identifie les services par port
-
-**Fonctions principales:**
-
-```python
-def scan_port(ip, port, timeout=2):
-    # Retourne True si port ouvert
-
-def grab_banner(ip, port, timeout=3):
-    # Recupere banniere du service
-
-def scan_network(target, scan_type='quick'):
-    # scan_type: 'quick' (25 ports), 'full' (100+), 'all' (65535)
-
-def ping_sweep(network):
-    # Decouvre hotes actifs sur un /24
-```
-
-**Ports scannes (mode quick):**
-21, 22, 23, 25, 53, 80, 110, 135, 139, 143, 443, 445, 993, 995,
-1433, 1521, 3306, 3389, 5432, 5900, 6379, 8080, 8443, 27017
-
----
-
-#### 6. Active Directory (`backend/ad.py`)
-
-**Fonctionnement:**
-1. Scanne les ports AD standards
-2. Detecte si la cible est un DC
-3. Teste l'acces LDAP anonyme
-4. Verifie les sessions NULL SMB
-
-**Fonctions principales:**
-
-```python
-def detect_domain_controller(target):
-    # Score de confiance base sur ports AD ouverts
-    # Retourne: is_dc, confidence, indicators
-
-def check_ldap_anonymous(target):
-    # Tente connexion LDAP anonyme
-
-def check_smb_null_session(target):
-    # Verifie sessions NULL SMB
-```
-
-**Ports AD:**
-- 88: Kerberos
-- 389: LDAP
-- 636: LDAPS
-- 445: SMB
-- 3268: LDAP Global Catalog
-- 9389: AD Web Services
-
----
-
-#### 7. Vulnerabilites (`backend/vulns.py`)
-
-**Scanners disponibles:**
-
-| Type | Fichier | Detection |
-|------|---------|-----------|
-| SQLi | `scripts/sqli_scanner.py` | Error-based, Boolean-based |
-| XSS | `scripts/xss_scanner.py` | Reflected XSS |
-| JS Secrets | `scripts/js_secret_scanner.py` | API keys, tokens dans JS |
-
-**Patterns JS detectes:**
-- Google API Keys
-- AWS Access/Secret Keys
-- Stripe Keys (pk_live, sk_live)
-- GitHub Tokens
-- JWT Tokens
-- Private Keys
-
----
-
-#### 8. HTTP Tools (`backend/http_tools.py`)
-
-**Request Builder:**
-- Envoi requetes HTTP personnalisees
-- Sauvegarde historique
-- Replay de requetes
-
----
-
-## Frontend (React/TypeScript)
-
-### Structure des fichiers
-
-```
-frontend/src/
-|-- App.tsx                    # Routeur principal
-|-- index.css                  # Variables CSS globales
-|-- main.tsx                   # Point d'entree React
-|
-|-- context/
-|   |-- AuthContext.tsx        # Context authentification
-|
-|-- pages/
-|   |-- Home.tsx               # Page d'accueil
-|   |-- Login.tsx              # Connexion
-|   |-- Register.tsx           # Inscription
-|   |-- Investigation.tsx      # Page investigation (onglets)
-|   |-- InvestigationsList.tsx # Liste investigations
-|
-|-- components/
-    |-- ReconGraph.tsx         # Visualisation graphe React Flow
-    |-- ReconList.tsx          # Liste resultats reconnaissance
-    |-- EnumDisplay.tsx        # Affichage enumeration
-    |-- NetworkDisplay.tsx     # Affichage scan reseau
-    |-- ADDisplay.tsx          # Affichage scan AD
-    |-- VulnDisplay.tsx        # Affichage vulnerabilites
-    |-- RequestBuilder.tsx     # Builder requetes HTTP
-    |-- HttpHistory.tsx        # Historique requetes
-```
-
----
-
-### Context d'authentification
-
-**Fichier: `frontend/src/context/AuthContext.tsx`**
+### Appels API avec credentials
 
 ```typescript
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  register: (email: string, username: string, password: string) => Promise<void>;
-}
+// Toujours inclure credentials pour les cookies de session
+const response = await fetch('/api/investigations', {
+  credentials: 'include',  // IMPORTANT
+  headers: { 'Content-Type': 'application/json' }
+});
 ```
 
-Usage dans composants:
+### Proxy Vite
+
+Le frontend tourne sur `:5173`, le backend sur `:5000`.
+Vite proxy les requetes `/api/*`:
+
+**vite.config.ts:**
 ```typescript
-const { user, login, logout } = useAuth();
-```
-
----
-
-### Page Investigation
-
-**Fichier: `frontend/src/pages/Investigation.tsx`**
-
-Gere les onglets:
-1. **Reconnaissance** - Scan de paths HTTP
-2. **Enumeration** - Detection technologies
-3. **Network** - Scan de ports
-4. **Active Directory** - Enumeration AD
-5. **Exploitation** - SQLi, XSS, JS Secrets
-6. **Rapport** - Synthese (a implementer)
-
-Chaque onglet charge son composant correspondant qui fait des appels API.
-
----
-
-### Variables CSS
-
-**Fichier: `frontend/src/index.css`**
-
-```css
-:root {
-  /* Couleurs de fond */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f6f8fa;
-  --bg-tertiary: #f0f2f5;
-
-  /* Couleurs de texte */
-  --text-primary: #1f2328;
-  --text-secondary: #656d76;
-  --text-muted: #8b949e;
-
-  /* Couleurs d'accent */
-  --accent-primary: #0969da;    /* Bleu */
-  --accent-success: #1a7f37;    /* Vert */
-  --accent-warning: #9a6700;    /* Orange */
-  --accent-error: #cf222e;      /* Rouge */
-
-  /* Bordures */
-  --border-color: #d0d7de;
-}
-```
-
----
-
-## Flux de donnees typique
-
-### Exemple: Lancement d'un scan reseau
-
-```
-1. Frontend: NetworkDisplay.tsx
-   -> Clic bouton "Lancer scan"
-   -> POST /api/investigations/:id/network-scans
-
-2. Backend: network.py
-   -> Cree NetworkScan en base (status: running)
-   -> Lance thread en arriere-plan
-   -> Retourne immediatement scan.to_dict()
-
-3. Thread arriere-plan
-   -> scan_network(target, scan_type)
-   -> Pour chaque port ouvert: cree NetworkResult
-   -> Met a jour scan.status = 'completed'
-
-4. Frontend: Polling
-   -> GET /api/network-scans/:id (toutes les 2s)
-   -> Si status == 'completed':
-      -> GET /api/network-scans/:id/results
-      -> Affiche resultats
-```
-
----
-
-## Configuration
-
-### Backend
-
-**Variables d'environnement (optionnel):**
-```
-SECRET_KEY=votre_cle_secrete
-DATABASE_URL=sqlite:///instance/app.db
-```
-
-**Configuration dans app.py:**
-```python
-app.config['SECRET_KEY'] = 'dev-key-change-in-production'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/app.db'
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-```
-
-### Frontend
-
-**Fichier: `frontend/vite.config.ts`**
-```typescript
-proxy: {
-  '/api': {
-    target: 'http://localhost:5000',
-    changeOrigin: true,
+server: {
+  proxy: {
+    '/api': {
+      target: 'http://localhost:5000',
+      changeOrigin: true
+    }
   }
 }
 ```
 
----
+### Polling pour les scans
 
-## Base de donnees
+```typescript
+useEffect(() => {
+  if (activeScan?.status === 'running') {
+    const interval = setInterval(() => {
+      // Verifie le statut toutes les 2 secondes
+      fetch(`/api/network-scans/${activeScan.id}`)
+        .then(r => r.json())
+        .then(scan => {
+          if (scan.status === 'completed') {
+            loadResults(scan.id);
+            clearInterval(interval);
+          }
+        });
+    }, 2000);
 
-### Localisation
-`backend/instance/app.db` (SQLite)
-
-### Reinitialisation
-```bash
-cd backend
-rm instance/app.db
-python -c "from app import app, db; app.app_context().push(); db.create_all()"
+    return () => clearInterval(interval);
+  }
+}, [activeScan]);
 ```
 
-### Inspection
-```bash
-sqlite3 backend/instance/app.db
-.tables
-.schema User
-SELECT * FROM user;
+---
+
+## Ajouter une nouvelle fonctionnalite
+
+### 1. Creer le script Python
+
+```python
+# backend/scripts/nouveau/mon_scanner.py
+
+def scan_something(target, options):
+    """Script sans dependance Flask"""
+    results = []
+    # ... logique de scan ...
+    return results
+
+if __name__ == '__main__':
+    # Executable directement pour tests
+    import sys
+    target = sys.argv[1]
+    print(scan_something(target, {}))
 ```
 
----
+### 2. Creer le blueprint
 
-## Securite implementee
+```python
+# backend/blueprints/nouveau.py
 
-| Mesure | Implementation |
-|--------|----------------|
-| Hash mots de passe | bcrypt via Flask-Bcrypt |
-| Sessions | Flask-Login avec cookies HttpOnly |
-| CORS | Flask-CORS avec credentials |
-| Permissions | Verification owner/member sur chaque route |
-| Upload fichiers | Whitelist extensions (.txt, .pdf, .png, etc.) |
-| Validation | Verification des entrees avant traitement |
+from flask import Blueprint, request, jsonify
+from flask_login import login_required, current_user
+from models import db, Investigation
+import threading
+import sys
+import os
 
----
+nouveau_bp = Blueprint('nouveau', __name__)
 
-## Points d'extension
+# Charger le script
+SCRIPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts', 'nouveau')
+sys.path.insert(0, SCRIPTS_DIR)
+from mon_scanner import scan_something
 
-### Ajouter un nouveau module backend
+@nouveau_bp.route('/api/investigations/<int:inv_id>/nouveau-scan', methods=['POST'])
+@login_required
+def start_scan(inv_id):
+    # ... creer scan en DB, lancer thread ...
+    pass
+```
 
-1. Creer `backend/nouveau_module.py`
-2. Creer Blueprint:
-   ```python
-   from flask import Blueprint
-   nouveau_bp = Blueprint('nouveau', __name__)
-   ```
-3. Ajouter routes avec decorateurs
-4. Enregistrer dans `app.py`:
-   ```python
-   from nouveau_module import nouveau_bp
-   app.register_blueprint(nouveau_bp)
-   ```
+### 3. Enregistrer dans app.py
 
-### Ajouter un nouvel onglet frontend
+```python
+from blueprints.nouveau import nouveau_bp
+app.register_blueprint(nouveau_bp)
+```
 
-1. Creer `frontend/src/components/NouveauDisplay.tsx`
-2. Dans `Investigation.tsx`:
-   - Ajouter tab: `{ id: 'nouveau', label: 'Nouveau' }`
-   - Ajouter case dans `renderTabContent()`
-   - Importer le composant
+### 4. Creer le composant React
+
+```typescript
+// frontend/src/components/NouveauDisplay.tsx
+
+function NouveauDisplay({ investigationId }) {
+  const startScan = async () => {
+    await fetch(`/api/investigations/${investigationId}/nouveau-scan`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+  };
+
+  return <button onClick={startScan}>Lancer</button>;
+}
+```
+
+### 5. Ajouter l'onglet
+
+```typescript
+// frontend/src/pages/Investigation.tsx
+
+const tabs = [
+  // ... autres onglets ...
+  { id: 'nouveau', label: 'Nouveau' }
+];
+
+const renderTabContent = () => {
+  switch (activeTab) {
+    case 'nouveau':
+      return <NouveauDisplay investigationId={id} />;
+  }
+};
+```
 
 ---
 
 ## Commandes utiles
 
 ```bash
-# Backend
-cd backend
-python -m venv venv
-venv\Scripts\activate  # Windows
-pip install -r requirements.txt
-python app.py
+# Demarrer le developpement
+cd backend && python app.py
+cd frontend && npm run dev
 
-# Frontend
-cd frontend
-npm install
-npm run dev
+# Reset la base de donnees
+cd backend
+rm instance/app.db
+python -c "from app import app, db; app.app_context().push(); db.create_all()"
+
+# Lancer les tests
+cd backend
+python -m pytest tests/ -v
 
 # Build production
-npm run build
+cd frontend && npm run build
 ```
+
+---
+
+## Variables d'environnement
+
+```bash
+# backend/.env (optionnel)
+SECRET_KEY=votre_cle_secrete_production
+DATABASE_URL=sqlite:///instance/app.db
+```
+
+---
+
+## Securite
+
+| Mesure | Implementation |
+|--------|----------------|
+| Mots de passe | Hashes bcrypt |
+| Sessions | Cookies HttpOnly, SameSite=Lax |
+| CORS | Origins whitelist |
+| Permissions | Verification owner/member par route |
+| Inputs | Validation cote serveur |
+| SQL | ORM SQLAlchemy (pas de raw SQL) |

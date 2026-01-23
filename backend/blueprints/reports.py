@@ -5,7 +5,7 @@ Module Reports - Génération de rapports PDF et HTML
 from flask import Blueprint, request, jsonify, send_file
 from flask_login import login_required, current_user
 from models import db, Investigation
-from report_generator import generate_html_report, generate_pdf_report
+from .report_generator import generate_html_report, generate_pdf_report
 from datetime import datetime
 import io
 

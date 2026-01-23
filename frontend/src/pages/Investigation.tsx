@@ -10,6 +10,9 @@ import VulnDisplay from '../components/VulnDisplay'
 import NetworkDisplay from '../components/NetworkDisplay'
 import ADDisplay from '../components/ADDisplay'
 import ReportGenerator from '../components/ReportGenerator'
+import TerminalTab from '../components/TerminalTab'
+import ActiveUsers from '../components/ActiveUsers'
+import Processes from '../components/Processes'
 import type { ReconResult } from '../components/ReconGraph'
 import type { EnumResult } from '../components/EnumDisplay'
 import './Investigation.css'
@@ -96,6 +99,7 @@ const TABS = [
   { id: 'network', label: 'Network' },
   { id: 'ad', label: 'Active Directory' },
   { id: 'exploit', label: 'Exploitation' },
+  { id: 'terminal', label: 'Terminal' },
   { id: 'rapport', label: 'Rapport' }
 ]
 
@@ -208,6 +212,26 @@ function Investigation() {
       return () => clearInterval(interval)
     }
   }, [activeEnumScan])
+
+  // Heartbeat pour le suivi de presence
+  useEffect(() => {
+    const sendHeartbeat = async () => {
+      try {
+        await fetch('/api/presence/heartbeat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ page: `investigation/${id}` })
+        })
+      } catch (e) {
+        // Ignorer les erreurs de heartbeat
+      }
+    }
+
+    sendHeartbeat()
+    const interval = setInterval(sendHeartbeat, 30000) // toutes les 30s
+    return () => clearInterval(interval)
+  }, [id])
 
   const loadInvestigation = async () => {
     try {
@@ -552,24 +576,32 @@ function Investigation() {
       case 'general':
         return (
           <div className="tab-content">
-            <div className="info-grid">
-              <div className="info-item">
-                <label>URL cible</label>
-                <a href={investigation?.target_url} target="_blank" rel="noopener noreferrer">
-                  {investigation?.target_url}
-                </a>
+            <div className="general-layout">
+              <div className="general-main">
+                <div className="info-grid">
+                  <div className="info-item">
+                    <label>URL cible</label>
+                    <a href={investigation?.target_url} target="_blank" rel="noopener noreferrer">
+                      {investigation?.target_url}
+                    </a>
+                  </div>
+                  <div className="info-item">
+                    <label>Description</label>
+                    <p>{investigation?.description || 'Aucune description'}</p>
+                  </div>
+                  <div className="info-item">
+                    <label>Proprietaire</label>
+                    <p>{investigation?.owner.username}</p>
+                  </div>
+                  <div className="info-item">
+                    <label>Cree le</label>
+                    <p>{investigation?.created_at ? new Date(investigation.created_at).toLocaleDateString() : '-'}</p>
+                  </div>
+                </div>
               </div>
-              <div className="info-item">
-                <label>Description</label>
-                <p>{investigation?.description || 'Aucune description'}</p>
-              </div>
-              <div className="info-item">
-                <label>Proprietaire</label>
-                <p>{investigation?.owner.username}</p>
-              </div>
-              <div className="info-item">
-                <label>Cree le</label>
-                <p>{investigation?.created_at ? new Date(investigation.created_at).toLocaleDateString() : '-'}</p>
+              <div className="general-sidebar">
+                <ActiveUsers />
+                <Processes />
               </div>
             </div>
           </div>
@@ -797,6 +829,13 @@ function Investigation() {
                 />
               </div>
             </div>
+          </div>
+        )
+
+      case 'terminal':
+        return (
+          <div className="tab-content terminal-tab">
+            <TerminalTab />
           </div>
         )
 

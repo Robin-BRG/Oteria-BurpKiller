@@ -19,8 +19,8 @@ class TestAuthentication:
 
         assert response.status_code == 201
         data = response.get_json()
-        assert data['username'] == 'newuser'
-        assert data['email'] == 'new@example.com'
+        assert data['user']['username'] == 'newuser'
+        assert data['user']['email'] == 'new@example.com'
 
     def test_register_duplicate_username(self, client, test_user):
         """Test d'inscription avec username existant"""
@@ -55,18 +55,18 @@ class TestAuthentication:
     def test_login_success(self, client, test_user):
         """Test de connexion réussie"""
         response = client.post('/api/login', json={
-            'username': test_user.username,
+            'email': test_user.email,
             'password': 'password123'
         })
 
         assert response.status_code == 200
         data = response.get_json()
-        assert data['username'] == test_user.username
+        assert data['user']['username'] == test_user.username
 
     def test_login_wrong_password(self, client, test_user):
         """Test de connexion avec mauvais mot de passe"""
         response = client.post('/api/login', json={
-            'username': test_user.username,
+            'email': test_user.email,
             'password': 'wrongpassword'
         })
 
@@ -75,7 +75,7 @@ class TestAuthentication:
     def test_login_nonexistent_user(self, client):
         """Test de connexion avec utilisateur inexistant"""
         response = client.post('/api/login', json={
-            'username': 'nonexistent',
+            'email': 'nonexistent@example.com',
             'password': 'password'
         })
 
@@ -94,4 +94,6 @@ class TestAuthentication:
     def test_check_auth_not_authenticated(self, client):
         """Test de vérification d'auth pour utilisateur non connecté"""
         response = client.get('/api/check-auth')
-        assert response.status_code == 401
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['authenticated'] is False

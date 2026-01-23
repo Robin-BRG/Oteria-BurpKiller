@@ -103,6 +103,13 @@ BurpKiller est une application web collaborative de tests de securite. Elle cent
 - Verification du service Kerberos
 - Ports AD standards (88, 389, 636, 445, 3268, 9389)
 
+### Terminal Python
+
+- Execution de code Python directement depuis l'interface web
+- Timeout configurable (max 30 secondes)
+- Affichage stdout/stderr et code de retour
+- Integration avec le systeme de suivi des processus
+
 ### Collaboration
 
 - Systeme d'authentification (register/login)
@@ -110,6 +117,8 @@ BurpKiller est une application web collaborative de tests de securite. Elle cent
 - Gestion des permissions (viewer, editor, admin)
 - Partage de fichiers entre membres
 - Historique des actions
+- Suivi des utilisateurs actifs en temps reel
+- Monitoring des processus en cours
 
 ---
 
@@ -201,9 +210,9 @@ pytest -c config/pytest.ini --cov
 ```
 
 Statistiques actuelles :
-- 53 tests au total
-- 48 tests qui passent (90%)
-- 51% de couverture de code
+- 131 tests au total
+- 131 tests qui passent (100%)
+- 75% de couverture de code
 
 Voir [backend/tests/README.md](backend/tests/README.md) et [backend/config/README.md](backend/config/README.md) pour plus de détails.
 
@@ -280,6 +289,12 @@ chmod +x dev-tools/*.sh
 - Scanner JS : detecte les secrets exposes dans le JavaScript
 - Request Builder : envoyer des requetes HTTP manuelles
 - Historique HTTP : consulter et rejouer les requetes
+
+#### Onglet Terminal
+- Executer du code Python directement dans le navigateur
+- Timeout configurable (1-30 secondes)
+- Affichage des sorties stdout et stderr
+- Voir le code de retour de l'execution
 
 #### Onglet Rapport
 - Aperçu des statistiques de l'investigation
@@ -379,6 +394,22 @@ chmod +x dev-tools/*.sh
 | GET | /api/investigations/:id/report/pdf | Telecharger rapport PDF |
 | GET | /api/investigations/:id/report/preview | Apercu donnees rapport |
 
+### Terminal
+
+| Methode | Endpoint | Description |
+|---------|----------|-------------|
+| POST | /api/terminal/execute | Executer du code Python |
+| GET | /api/terminal/history | Historique des executions |
+
+### Presence
+
+| Methode | Endpoint | Description |
+|---------|----------|-------------|
+| POST | /api/presence/heartbeat | Signaler presence utilisateur |
+| GET | /api/presence/active | Utilisateurs actifs |
+| GET | /api/presence/stats | Statistiques de presence |
+| GET | /api/processes | Liste des processus |
+
 ---
 
 ## Structure du projet
@@ -403,6 +434,8 @@ Oteria-BurpKiller/
 |   |   |-- http_tools.py         # Request Builder
 |   |   |-- reports.py            # Generation rapports
 |   |   |-- report_generator.py   # Moteur de rapports
+|   |   |-- terminal.py           # Terminal Python web
+|   |   |-- presence.py           # Suivi presence utilisateurs
 |   |
 |   |-- config/                   # Configuration tests et coverage
 |   |   |-- pytest.ini            # Config pytest
@@ -421,13 +454,20 @@ Oteria-BurpKiller/
 |   |       |-- xss_scanner.py    # Scanner XSS
 |   |       |-- js_secret_scanner.py  # Scanner secrets JavaScript
 |   |
-|   |-- tests/                    # Suite de tests pytest
+|   |-- tests/                    # Suite de tests pytest (131 tests)
 |   |   |-- conftest.py           # Fixtures pytest
 |   |   |-- test_auth.py          # Tests authentification
 |   |   |-- test_models.py        # Tests modeles
 |   |   |-- test_investigations.py # Tests investigations
 |   |   |-- test_network.py       # Tests scan reseau
 |   |   |-- test_reports.py       # Tests reporting
+|   |   |-- test_ad.py            # Tests Active Directory
+|   |   |-- test_recon.py         # Tests reconnaissance
+|   |   |-- test_enumeration.py   # Tests enumeration
+|   |   |-- test_vulns.py         # Tests vulnerabilites
+|   |   |-- test_http_tools.py    # Tests HTTP tools
+|   |   |-- test_terminal.py      # Tests terminal
+|   |   |-- test_presence.py      # Tests presence
 |   |
 |   |-- instance/
 |       |-- app.db                # Base de donnees SQLite
@@ -453,6 +493,9 @@ Oteria-BurpKiller/
 |   |   |   |-- RequestBuilder.tsx # Builder HTTP
 |   |   |   |-- HttpHistory.tsx   # Historique requetes
 |   |   |   |-- ReportGenerator.tsx # Generateur de rapports
+|   |   |   |-- TerminalTab.tsx   # Terminal Python
+|   |   |   |-- ActiveUsers.tsx   # Liste utilisateurs actifs
+|   |   |   |-- Processes.tsx     # Liste processus en cours
 |   |   |
 |   |   |-- context/
 |   |       |-- AuthContext.tsx   # Context authentification

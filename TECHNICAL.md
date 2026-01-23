@@ -44,7 +44,9 @@ backend/
 │   ├── vulns.py              # Scan vulnerabilites
 │   ├── http_tools.py         # Request builder
 │   ├── reports.py            # Generation rapports
-│   └── report_generator.py   # Logique generation PDF/HTML
+│   ├── report_generator.py   # Logique generation PDF/HTML
+│   ├── terminal.py           # Terminal Python web
+│   └── presence.py           # Suivi presence utilisateurs
 │
 ├── scripts/                  # Scripts Python "purs"
 │   ├── recon/
@@ -56,12 +58,19 @@ backend/
 │       ├── xss_scanner.py    # Scanner XSS
 │       └── js_secret_scanner.py
 │
-├── tests/                    # Tests unitaires
+├── tests/                    # Tests unitaires (131 tests, 75% coverage)
 │   ├── conftest.py           # Fixtures pytest
 │   ├── test_auth.py
 │   ├── test_investigations.py
 │   ├── test_network.py
-│   └── test_reports.py
+│   ├── test_reports.py
+│   ├── test_ad.py
+│   ├── test_recon.py
+│   ├── test_enumeration.py
+│   ├── test_vulns.py
+│   ├── test_http_tools.py
+│   ├── test_terminal.py
+│   └── test_presence.py
 │
 └── instance/
     └── app.db                # Base SQLite
@@ -89,7 +98,10 @@ frontend/
 │       ├── EnumDisplay.tsx/.css
 │       ├── VulnDisplay.tsx/.css
 │       ├── RequestBuilder.tsx/.css
-│       └── ReportGenerator.tsx/.css
+│       ├── ReportGenerator.tsx/.css
+│       ├── TerminalTab.tsx/.css      # Terminal Python
+│       ├── ActiveUsers.tsx/.css      # Utilisateurs actifs
+│       └── Processes.tsx/.css        # Processus en cours
 │
 └── vite.config.ts            # Config Vite (proxy API)
 ```
@@ -541,3 +553,117 @@ DATABASE_URL=sqlite:///instance/app.db
 | Permissions | Verification owner/member par route |
 | Inputs | Validation cote serveur |
 | SQL | ORM SQLAlchemy (pas de raw SQL) |
+
+---
+
+## Module Terminal
+
+Le module Terminal permet d'executer du code Python directement depuis l'interface web.
+
+### Architecture
+
+```
+Frontend (TerminalTab.tsx)
+    │
+    ▼ POST /api/terminal/execute
+    │  { code: "...", timeout: 10 }
+    │
+Backend (terminal.py)
+    │
+    ├─► Cree fichier temporaire (.py)
+    ├─► Lance subprocess Python
+    ├─► Capture stdout/stderr
+    └─► Retourne resultat JSON
+```
+
+### Securite du Terminal
+
+- Timeout configurable (max 30s)
+- Fichiers temporaires supprimes apres execution
+- Authentification requise
+- Processus enregistre dans le systeme de presence
+
+### Exemple de requete
+
+```bash
+curl -X POST http://localhost:5000/api/terminal/execute \
+  -H "Content-Type: application/json" \
+  -d '{"code": "print(2+2)", "timeout": 5}'
+```
+
+Reponse:
+```json
+{
+  "stdout": "4\n",
+  "stderr": "",
+  "returncode": 0,
+  "timeout": false
+}
+```
+
+---
+
+## Module Presence
+
+Le module Presence permet de suivre les utilisateurs connectes et les processus en cours.
+
+### Fonctionnement
+
+```
+┌─────────────────┐     ┌─────────────────┐
+│    Frontend     │     │     Backend     │
+│                 │     │                 │
+│  useEffect()    │────▶│  /heartbeat     │
+│  interval 30s   │     │                 │
+│                 │     │  _active_users  │
+│  ActiveUsers    │◀────│  (in-memory)    │
+│  Processes      │     │  _processes     │
+└─────────────────┘     └─────────────────┘
+```
+
+### Heartbeat
+
+Le frontend envoie un heartbeat toutes les 30 secondes pour signaler sa presence:
+
+```javascript
+// Investigation.tsx
+useEffect(() => {
+  const sendHeartbeat = async () => {
+    await fetch('/api/presence/heartbeat', {
+      method: 'POST',
+      body: JSON.stringify({ page: `investigation/${id}` })
+    });
+  };
+
+  sendHeartbeat();
+  const interval = setInterval(sendHeartbeat, 30000);
+  return () => clearInterval(interval);
+}, [id]);
+```
+
+### Nettoyage automatique
+
+Un thread de nettoyage tourne en arriere-plan:
+- Utilisateurs inactifs depuis 90s → supprimes
+- Processus termines depuis 5min → supprimes
+
+### Routes API
+
+| Route | Description |
+|-------|-------------|
+| `POST /api/presence/heartbeat` | Signaler presence |
+| `GET /api/presence/active` | Liste utilisateurs actifs |
+| `GET /api/processes` | Liste processus en cours |
+| `GET /api/presence/stats` | Statistiques |
+
+### Fonctions utilitaires (pour autres modules)
+
+```python
+from blueprints.presence import start_process, stop_process
+
+# Enregistrer un processus
+pid = start_process('scan', 'Scan de ports', owner='user1')
+
+# Terminer un processus
+stop_process(pid, status='completed')
+```

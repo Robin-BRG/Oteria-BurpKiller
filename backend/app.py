@@ -66,9 +66,16 @@ from blueprints.vulns import vulns_bp
 from blueprints.network import network_bp
 from blueprints.ad import ad_bp
 from blueprints.reports import reports_bp
+from blueprints.terminal import terminal_bp
+from blueprints.presence import presence_bp
 
 db.init_app(app)
 bcrypt.init_app(app)
+
+# Creer les tables de la base de donnees si elles n'existent pas
+with app.app_context():
+    db.create_all()
+    logger.info('Database tables initialized')
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -90,6 +97,8 @@ app.register_blueprint(vulns_bp)
 app.register_blueprint(network_bp)
 app.register_blueprint(ad_bp)
 app.register_blueprint(reports_bp)
+app.register_blueprint(terminal_bp)
+app.register_blueprint(presence_bp)
 
 @app.route('/api/health', methods=['GET'])
 def health():
@@ -101,6 +110,12 @@ def health():
 @app.errorhandler(Exception)
 def handle_exception(error):
     """Log et gere les exceptions non capturees"""
+    from werkzeug.exceptions import HTTPException
+
+    # Si c'est une exception HTTP (404, 403, etc.), la propager
+    if isinstance(error, HTTPException):
+        return jsonify({'error': error.description}), error.code
+
     logger.exception(f'Unhandled exception: {str(error)}')
     return jsonify({'error': 'Internal server error'}), 500
 

@@ -3,6 +3,7 @@
 Configuration pytest - Fixtures partagées pour tous les tests
 """
 import pytest
+import uuid
 from app import app as flask_app
 from models import db, User, Investigation
 
@@ -41,9 +42,11 @@ def test_user(app):
     """Créer un utilisateur de test"""
     from blueprints.auth import bcrypt
 
+    # Utiliser un suffixe unique pour eviter les collisions
+    unique_id = str(uuid.uuid4())[:8]
     user = User(
-        username='testuser',
-        email='test@example.com'
+        username=f'testuser_{unique_id}',
+        email=f'test_{unique_id}@example.com'
     )
     user.password_hash = bcrypt.generate_password_hash('password123').decode('utf-8')
 

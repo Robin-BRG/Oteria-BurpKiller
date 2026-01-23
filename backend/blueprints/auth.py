@@ -70,8 +70,9 @@ def register():
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f'Registration failed for {username}: {str(e)}')
-        return jsonify({'error': f'Registration failed: {str(e)}'}), 500
+        user_info = username if 'username' in dir() else 'unknown'
+        logger.error(f'Registration failed for {user_info}: {str(e)}')
+        return jsonify({'error': 'Registration failed'}), 500
 
 @auth_bp.route('/api/login', methods=['POST'])
 def login():

@@ -732,6 +732,17 @@ class BloodHoundAnalysis(db.Model):
     # Domaine detecte
     domain = db.Column(db.String(255), nullable=True)
 
+    # Methode d'analyse: 'native' (parser JSON) ou 'neo4j_adminer' (Neo4j + AD-Miner)
+    analysis_method = db.Column(db.String(20), default='native')
+
+    # Neo4j integration
+    neo4j_imported = db.Column(db.Boolean, default=False)
+    neo4j_uri = db.Column(db.String(255), nullable=True)
+
+    # AD-Miner integration
+    adminer_executed = db.Column(db.Boolean, default=False)
+    adminer_report_path = db.Column(db.String(500), nullable=True)
+
     # Statistiques
     users_count = db.Column(db.Integer, default=0)
     computers_count = db.Column(db.Integer, default=0)
@@ -759,6 +770,11 @@ class BloodHoundAnalysis(db.Model):
             'investigation_id': self.investigation_id,
             'name': self.name,
             'domain': self.domain,
+            'analysis_method': self.analysis_method,
+            'neo4j_imported': self.neo4j_imported,
+            'neo4j_uri': self.neo4j_uri,
+            'adminer_executed': self.adminer_executed,
+            'adminer_report_path': self.adminer_report_path,
             'users_count': self.users_count,
             'computers_count': self.computers_count,
             'groups_count': self.groups_count,

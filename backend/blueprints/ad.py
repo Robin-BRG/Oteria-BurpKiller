@@ -23,9 +23,11 @@ import tempfile
 
 ad_bp = Blueprint('ad', __name__)
 
-# Dossier pour les fichiers BloodHound
+# Dossiers pour les fichiers BloodHound et AD-Miner
 BLOODHOUND_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads', 'bloodhound')
+ADMINER_REPORTS_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads', 'adminer_reports')
 os.makedirs(BLOODHOUND_UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(ADMINER_REPORTS_FOLDER, exist_ok=True)
 
 
 # ============================================================================
@@ -384,6 +386,284 @@ class BloodHoundParser:
             sev = f.get('severity', 'info')
             summary[sev] = summary.get(sev, 0) + 1
         return summary
+
+
+# ============================================================================
+# NEO4J & AD-MINER INTEGRATION
+# ============================================================================
+
+def check_neo4j_connection(host='localhost', port=7687, username='neo4j', password='bloodhound'):
+    """Verifier la connexion a Neo4j"""
+    try:
+        from neo4j import GraphDatabase
+        uri = f"bolt://{host}:{port}"
+        driver = GraphDatabase.driver(uri, auth=(username, password))
+        with driver.session() as session:
+            result = session.run("RETURN 1")
+            result.single()
+        driver.close()
+        return {'connected': True, 'uri': uri}
+    except ImportError:
+        return {'connected': False, 'error': 'neo4j Python driver not installed. Install with: pip install neo4j'}
+    except Exception as e:
+        return {'connected': False, 'error': str(e)}
+
+
+def import_bloodhound_to_neo4j(json_files, neo4j_config=None):
+    """Importer les fichiers BloodHound dans Neo4j en utilisant bloodhound-python ou SharpHound"""
+    if neo4j_config is None:
+        neo4j_config = {
+            'host': 'localhost',
+            'port': 7687,
+            'username': 'neo4j',
+            'password': 'bloodhound'
+        }
+
+    results = []
+
+    # Verifier la connexion Neo4j
+    connection_test = check_neo4j_connection(
+        neo4j_config['host'],
+        neo4j_config['port'],
+        neo4j_config['username'],
+        neo4j_config['password']
+    )
+
+    if not connection_test['connected']:
+        return {
+            'success': False,
+            'error': connection_test['error'],
+            'results': []
+        }
+
+    # Importer les fichiers avec la librairie neo4j
+    try:
+        from neo4j import GraphDatabase
+
+        uri = f"bolt://{neo4j_config['host']}:{neo4j_config['port']}"
+        driver = GraphDatabase.driver(uri, auth=(neo4j_config['username'], neo4j_config['password']))
+
+        for json_file in json_files:
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+
+                # Importer selon le type de fichier
+                file_type = os.path.basename(json_file).lower()
+
+                with driver.session() as session:
+                    if 'users' in file_type or 'user' in file_type:
+                        count = import_users_to_neo4j(session, data)
+                        results.append(f"Imported {count} users")
+                    elif 'computers' in file_type or 'computer' in file_type:
+                        count = import_computers_to_neo4j(session, data)
+                        results.append(f"Imported {count} computers")
+                    elif 'groups' in file_type or 'group' in file_type:
+                        count = import_groups_to_neo4j(session, data)
+                        results.append(f"Imported {count} groups")
+                    elif 'domains' in file_type or 'domain' in file_type:
+                        count = import_domains_to_neo4j(session, data)
+                        results.append(f"Imported {count} domains")
+
+            except Exception as e:
+                results.append(f"Error importing {os.path.basename(json_file)}: {str(e)}")
+
+        driver.close()
+
+        return {
+            'success': True,
+            'results': results,
+            'uri': uri
+        }
+
+    except ImportError:
+        return {
+            'success': False,
+            'error': 'neo4j library not installed',
+            'results': []
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e),
+            'results': results
+        }
+
+
+def import_users_to_neo4j(session, data):
+    """Importer les utilisateurs dans Neo4j"""
+    objects = data.get('data', [data] if isinstance(data, dict) else data)
+    count = 0
+
+    for obj in objects:
+        props = obj.get('Properties', obj.get('properties', {}))
+        name = props.get('name', 'Unknown')
+
+        query = """
+        MERGE (u:User {name: $name})
+        SET u.samaccountname = $samaccountname,
+            u.enabled = $enabled,
+            u.admincount = $admincount,
+            u.hasspn = $hasspn,
+            u.dontreqpreauth = $dontreqpreauth
+        """
+
+        session.run(query,
+            name=name,
+            samaccountname=props.get('samaccountname', ''),
+            enabled=props.get('enabled', True),
+            admincount=props.get('admincount', False),
+            hasspn=props.get('hasspn', False),
+            dontreqpreauth=props.get('dontreqpreauth', False)
+        )
+        count += 1
+
+    return count
+
+
+def import_computers_to_neo4j(session, data):
+    """Importer les ordinateurs dans Neo4j"""
+    objects = data.get('data', [data] if isinstance(data, dict) else data)
+    count = 0
+
+    for obj in objects:
+        props = obj.get('Properties', obj.get('properties', {}))
+        name = props.get('name', 'Unknown')
+
+        query = """
+        MERGE (c:Computer {name: $name})
+        SET c.operatingsystem = $os,
+            c.enabled = $enabled,
+            c.unconstraineddelegation = $unconstraineddelegation,
+            c.haslaps = $haslaps
+        """
+
+        session.run(query,
+            name=name,
+            os=props.get('operatingsystem', ''),
+            enabled=props.get('enabled', True),
+            unconstraineddelegation=props.get('unconstraineddelegation', False),
+            haslaps=props.get('haslaps', False)
+        )
+        count += 1
+
+    return count
+
+
+def import_groups_to_neo4j(session, data):
+    """Importer les groupes dans Neo4j"""
+    objects = data.get('data', [data] if isinstance(data, dict) else data)
+    count = 0
+
+    for obj in objects:
+        props = obj.get('Properties', obj.get('properties', {}))
+        name = props.get('name', 'Unknown')
+
+        query = """
+        MERGE (g:Group {name: $name})
+        SET g.samaccountname = $samaccountname,
+            g.admincount = $admincount
+        """
+
+        session.run(query,
+            name=name,
+            samaccountname=props.get('samaccountname', ''),
+            admincount=props.get('admincount', False)
+        )
+        count += 1
+
+    return count
+
+
+def import_domains_to_neo4j(session, data):
+    """Importer les domaines dans Neo4j"""
+    objects = data.get('data', [data] if isinstance(data, dict) else data)
+    count = 0
+
+    for obj in objects:
+        props = obj.get('Properties', obj.get('properties', {}))
+        name = props.get('name', 'Unknown')
+
+        query = """
+        MERGE (d:Domain {name: $name})
+        SET d.functionallevel = $functionallevel
+        """
+
+        session.run(query,
+            name=name,
+            functionallevel=props.get('functionallevel', '')
+        )
+        count += 1
+
+    return count
+
+
+def run_adminer_analysis(neo4j_config, output_dir):
+    """Executer AD-Miner pour analyser les donnees Neo4j"""
+    import subprocess
+
+    # Verifier si AD-Miner est installe
+    try:
+        result = subprocess.run(['AD-Miner', '--version'],
+                              capture_output=True,
+                              text=True,
+                              timeout=5)
+        if result.returncode != 0:
+            return {
+                'success': False,
+                'error': 'AD-Miner not found. Install from: https://github.com/Mazars-Tech/AD_Miner'
+            }
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return {
+            'success': False,
+            'error': 'AD-Miner not installed. Install with: pip install ad-miner'
+        }
+
+    # Executer AD-Miner
+    try:
+        cmd = [
+            'AD-Miner',
+            '-u', neo4j_config.get('username', 'neo4j'),
+            '-p', neo4j_config.get('password', 'bloodhound'),
+            '-b', f"bolt://{neo4j_config.get('host', 'localhost')}:{neo4j_config.get('port', 7687)}",
+            '-o', output_dir
+        ]
+
+        result = subprocess.run(cmd,
+                              capture_output=True,
+                              text=True,
+                              timeout=300)  # 5 minutes timeout
+
+        if result.returncode == 0:
+            # Chercher le fichier de rapport HTML genere
+            report_files = []
+            for root, dirs, files in os.walk(output_dir):
+                for file in files:
+                    if file.endswith('.html'):
+                        report_files.append(os.path.join(root, file))
+
+            return {
+                'success': True,
+                'output': result.stdout,
+                'report_files': report_files
+            }
+        else:
+            return {
+                'success': False,
+                'error': result.stderr or result.stdout,
+                'returncode': result.returncode
+            }
+
+    except subprocess.TimeoutExpired:
+        return {
+            'success': False,
+            'error': 'AD-Miner execution timeout (>5 minutes)'
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
 
 
 # ============================================================================
@@ -1491,3 +1771,189 @@ def get_bloodhound_summary(analysis_id):
             severity='critical'
         ).limit(5).all()]
     })
+
+
+# ============================================================================
+# ROUTES API NEO4J & AD-MINER
+# ============================================================================
+
+@ad_bp.route('/api/bloodhound/<int:analysis_id>/neo4j/import', methods=['POST'])
+@login_required
+def import_to_neo4j(analysis_id):
+    """Importer une analyse BloodHound dans Neo4j"""
+    analysis = BloodHoundAnalysis.query.get_or_404(analysis_id)
+    investigation = Investigation.query.get(analysis.investigation_id)
+
+    if not investigation.user_can_edit(current_user):
+        return jsonify({'error': 'Non autorise'}), 403
+
+    if analysis.status != 'completed':
+        return jsonify({'error': 'L\'analyse doit etre completee avant l\'import Neo4j'}), 400
+
+    # Configuration Neo4j depuis la requete
+    data = request.get_json() or {}
+    neo4j_config = {
+        'host': data.get('host', 'localhost'),
+        'port': data.get('port', 7687),
+        'username': data.get('username', 'neo4j'),
+        'password': data.get('password', 'bloodhound')
+    }
+
+    # Recuperer les fichiers JSON de cette analyse
+    analysis_folder = os.path.join(BLOODHOUND_UPLOAD_FOLDER, str(analysis_id))
+    json_files = []
+
+    if os.path.exists(analysis_folder):
+        for root, dirs, files in os.walk(analysis_folder):
+            for file in files:
+                if file.endswith('.json'):
+                    json_files.append(os.path.join(root, file))
+
+    if not json_files:
+        return jsonify({'error': 'Aucun fichier JSON trouve pour cette analyse'}), 400
+
+    # Lancer l'import en arriere-plan
+    def run_import():
+        from app import app
+        with app.app_context():
+            try:
+                analysis_obj = db.session.get(BloodHoundAnalysis, analysis.id)
+
+                # Importer dans Neo4j
+                result = import_bloodhound_to_neo4j(json_files, neo4j_config)
+
+                if result['success']:
+                    analysis_obj.neo4j_imported = True
+                    analysis_obj.neo4j_uri = result.get('uri')
+                    db.session.commit()
+                else:
+                    analysis_obj.error_message = result.get('error', 'Import Neo4j failed')
+                    db.session.commit()
+
+            except Exception as e:
+                analysis_obj = db.session.get(BloodHoundAnalysis, analysis.id)
+                if analysis_obj:
+                    analysis_obj.error_message = f"Neo4j import error: {str(e)}"
+                    db.session.commit()
+
+    thread = threading.Thread(target=run_import, daemon=True)
+    thread.start()
+
+    return jsonify({
+        'message': 'Import Neo4j demarre',
+        'analysis': analysis.to_dict()
+    }), 202
+
+
+@ad_bp.route('/api/bloodhound/<int:analysis_id>/adminer/run', methods=['POST'])
+@login_required
+def run_adminer(analysis_id):
+    """Executer AD-Miner sur les donnees Neo4j"""
+    analysis = BloodHoundAnalysis.query.get_or_404(analysis_id)
+    investigation = Investigation.query.get(analysis.investigation_id)
+
+    if not investigation.user_can_edit(current_user):
+        return jsonify({'error': 'Non autorise'}), 403
+
+    if not analysis.neo4j_imported:
+        return jsonify({'error': 'Les donnees doivent d\'abord etre importees dans Neo4j'}), 400
+
+    # Configuration Neo4j depuis la requete
+    data = request.get_json() or {}
+    neo4j_config = {
+        'host': data.get('host', 'localhost'),
+        'port': data.get('port', 7687),
+        'username': data.get('username', 'neo4j'),
+        'password': data.get('password', 'bloodhound')
+    }
+
+    # Dossier de sortie pour AD-Miner
+    output_dir = os.path.join(ADMINER_REPORTS_FOLDER, str(analysis_id))
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Lancer AD-Miner en arriere-plan
+    def run_analysis():
+        from app import app
+        with app.app_context():
+            try:
+                analysis_obj = db.session.get(BloodHoundAnalysis, analysis.id)
+
+                # Executer AD-Miner
+                result = run_adminer_analysis(neo4j_config, output_dir)
+
+                if result['success']:
+                    analysis_obj.adminer_executed = True
+                    # Stocker le chemin du rapport principal
+                    if result.get('report_files'):
+                        analysis_obj.adminer_report_path = result['report_files'][0]
+                    db.session.commit()
+                else:
+                    analysis_obj.error_message = result.get('error', 'AD-Miner execution failed')
+                    db.session.commit()
+
+            except Exception as e:
+                analysis_obj = db.session.get(BloodHoundAnalysis, analysis.id)
+                if analysis_obj:
+                    analysis_obj.error_message = f"AD-Miner error: {str(e)}"
+                    db.session.commit()
+
+    thread = threading.Thread(target=run_analysis, daemon=True)
+    thread.start()
+
+    return jsonify({
+        'message': 'AD-Miner demarre',
+        'analysis': analysis.to_dict()
+    }), 202
+
+
+@ad_bp.route('/api/bloodhound/<int:analysis_id>/adminer/report', methods=['GET'])
+@login_required
+def get_adminer_report(analysis_id):
+    """Recuperer le rapport HTML d'AD-Miner"""
+    analysis = BloodHoundAnalysis.query.get_or_404(analysis_id)
+    investigation = Investigation.query.get(analysis.investigation_id)
+
+    if not investigation.user_can_view(current_user):
+        return jsonify({'error': 'Non autorise'}), 403
+
+    if not analysis.adminer_executed or not analysis.adminer_report_path:
+        return jsonify({'error': 'Aucun rapport AD-Miner disponible'}), 404
+
+    # Lire le rapport HTML
+    try:
+        with open(analysis.adminer_report_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+
+        return jsonify({
+            'html': html_content,
+            'report_path': analysis.adminer_report_path
+        })
+    except FileNotFoundError:
+        return jsonify({'error': 'Fichier de rapport introuvable'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@ad_bp.route('/api/neo4j/test', methods=['POST'])
+@login_required
+def test_neo4j_connection():
+    """Tester la connexion a Neo4j"""
+    data = request.get_json() or {}
+    host = data.get('host', 'localhost')
+    port = data.get('port', 7687)
+    username = data.get('username', 'neo4j')
+    password = data.get('password', 'bloodhound')
+
+    result = check_neo4j_connection(host, port, username, password)
+
+    if result['connected']:
+        return jsonify({
+            'connected': True,
+            'uri': result['uri'],
+            'message': 'Connexion Neo4j reussie'
+        })
+    else:
+        return jsonify({
+            'connected': False,
+            'error': result['error']
+        }), 400

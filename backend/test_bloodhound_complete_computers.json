@@ -1,0 +1,177 @@
+{
+  "data": [
+    {
+      "Properties": {
+        "name": "DC01.CONTOSO.LOCAL",
+        "operatingsystem": "Windows Server 2019 Datacenter",
+        "enabled": true,
+        "unconstraineddelegation": true,
+        "allowedtodelegate": [],
+        "haslaps": false
+      },
+      "Aces": [
+        {
+          "RightName": "GetChangesAll",
+          "PrincipalName": "SVC_REPL@CONTOSO.LOCAL",
+          "PrincipalType": "User"
+        }
+      ]
+    },
+    {
+      "Properties": {
+        "name": "WEB01.CONTOSO.LOCAL",
+        "operatingsystem": "Windows Server 2012 R2 Standard",
+        "enabled": true,
+        "unconstraineddelegation": true,
+        "allowedtodelegate": [],
+        "haslaps": false
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "WEB02.CONTOSO.LOCAL",
+        "operatingsystem": "Windows Server 2016 Standard",
+        "enabled": true,
+        "unconstraineddelegation": false,
+        "allowedtodelegate": ["HTTP/intranet.contoso.local"],
+        "haslaps": true
+      },
+      "Aces": [
+        {
+          "RightName": "ReadLAPSPassword",
+          "PrincipalName": "HELPDESK@CONTOSO.LOCAL",
+          "PrincipalType": "Group"
+        }
+      ]
+    },
+    {
+      "Properties": {
+        "name": "LEGACY-PC.CONTOSO.LOCAL",
+        "operatingsystem": "Windows 7 Professional",
+        "enabled": true,
+        "unconstraineddelegation": false,
+        "allowedtodelegate": [],
+        "haslaps": false
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "OLDSERVER.CONTOSO.LOCAL",
+        "operatingsystem": "Windows Server 2008 R2 Standard",
+        "enabled": true,
+        "unconstraineddelegation": false,
+        "allowedtodelegate": [],
+        "haslaps": false
+      },
+      "Aces": [
+        {
+          "RightName": "AdminTo",
+          "PrincipalName": "HELPDESK@CONTOSO.LOCAL",
+          "PrincipalType": "Group"
+        }
+      ]
+    },
+    {
+      "Properties": {
+        "name": "FILE01.CONTOSO.LOCAL",
+        "operatingsystem": "Windows Server 2019 Standard",
+        "enabled": true,
+        "unconstraineddelegation": false,
+        "allowedtodelegate": [],
+        "haslaps": true
+      },
+      "Aces": [
+        {
+          "RightName": "ReadLAPSPassword",
+          "PrincipalName": "HELPDESK@CONTOSO.LOCAL",
+          "PrincipalType": "Group"
+        },
+        {
+          "RightName": "ReadLAPSPassword",
+          "PrincipalName": "IT_SUPPORT@CONTOSO.LOCAL",
+          "PrincipalType": "User"
+        }
+      ]
+    },
+    {
+      "Properties": {
+        "name": "SQL01.CONTOSO.LOCAL",
+        "operatingsystem": "Windows Server 2016 Datacenter",
+        "enabled": true,
+        "unconstraineddelegation": false,
+        "allowedtodelegate": [],
+        "haslaps": true
+      },
+      "Aces": [
+        {
+          "RightName": "AdminTo",
+          "PrincipalName": "SVC_SQL@CONTOSO.LOCAL",
+          "PrincipalType": "User"
+        }
+      ]
+    },
+    {
+      "Properties": {
+        "name": "BACKUP01.CONTOSO.LOCAL",
+        "operatingsystem": "Windows Server 2019 Standard",
+        "enabled": true,
+        "unconstraineddelegation": false,
+        "allowedtodelegate": [],
+        "haslaps": true
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "WORKSTATION01.CONTOSO.LOCAL",
+        "operatingsystem": "Windows 10 Enterprise",
+        "enabled": true,
+        "unconstraineddelegation": false,
+        "allowedtodelegate": [],
+        "haslaps": true
+      },
+      "Aces": [
+        {
+          "RightName": "CanRDP",
+          "PrincipalName": "REMOTE DESKTOP USERS@CONTOSO.LOCAL",
+          "PrincipalType": "Group"
+        }
+      ]
+    },
+    {
+      "Properties": {
+        "name": "WORKSTATION02.CONTOSO.LOCAL",
+        "operatingsystem": "Windows 10 Enterprise",
+        "enabled": true,
+        "unconstraineddelegation": false,
+        "allowedtodelegate": [],
+        "haslaps": true
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "EXCHANGE01.CONTOSO.LOCAL",
+        "operatingsystem": "Windows Server 2016 Standard",
+        "enabled": true,
+        "unconstraineddelegation": false,
+        "allowedtodelegate": [],
+        "haslaps": false
+      },
+      "Aces": [
+        {
+          "RightName": "WriteDacl",
+          "PrincipalName": "EXCHANGE TRUSTED SUBSYSTEM@CONTOSO.LOCAL",
+          "PrincipalType": "Group"
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "type": "computers",
+    "count": 11,
+    "version": 5
+  }
+}

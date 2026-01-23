@@ -1,0 +1,59 @@
+{
+  "data": [
+    {
+      "Properties": {
+        "name": "DC01.YOURLAB.LOCAL",
+        "operatingsystem": "Windows Server 2019 Datacenter",
+        "enabled": true,
+        "unconstraineddelegation": true,
+        "allowedtodelegate": [],
+        "haslaps": false
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "WEB01.YOURLAB.LOCAL",
+        "operatingsystem": "Windows Server 2012 R2 Standard",
+        "enabled": true,
+        "unconstraineddelegation": true,
+        "allowedtodelegate": [],
+        "haslaps": false
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "LEGACY-PC.YOURLAB.LOCAL",
+        "operatingsystem": "Windows 7 Professional",
+        "enabled": true,
+        "unconstraineddelegation": false,
+        "allowedtodelegate": [],
+        "haslaps": false
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "FILE01.YOURLAB.LOCAL",
+        "operatingsystem": "Windows Server 2008 R2 Standard",
+        "enabled": true,
+        "unconstraineddelegation": false,
+        "allowedtodelegate": [],
+        "haslaps": true
+      },
+      "Aces": [
+        {
+          "RightName": "ReadLAPSPassword",
+          "PrincipalName": "HELPDESK@YOURLAB.LOCAL",
+          "PrincipalType": "Group"
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "type": "computers",
+    "count": 4,
+    "version": 5
+  }
+}

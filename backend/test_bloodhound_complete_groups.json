@@ -1,0 +1,162 @@
+{
+  "data": [
+    {
+      "Properties": {
+        "name": "DOMAIN ADMINS@CONTOSO.LOCAL",
+        "samaccountname": "Domain Admins",
+        "admincount": true
+      },
+      "Members": [
+        {"MemberName": "ADMINISTRATOR@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "ADMIN_LEGACY@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "IT_ADMIN1@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "IT_ADMIN2@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "IT_ADMIN3@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "IT_ADMIN4@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "SERVICE_ADMIN@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "BACKUP_ADMIN@CONTOSO.LOCAL", "MemberType": "User"}
+      ],
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "ENTERPRISE ADMINS@CONTOSO.LOCAL",
+        "samaccountname": "Enterprise Admins",
+        "admincount": true
+      },
+      "Members": [
+        {"MemberName": "ADMINISTRATOR@CONTOSO.LOCAL", "MemberType": "User"}
+      ],
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "HELPDESK@CONTOSO.LOCAL",
+        "samaccountname": "HelpDesk",
+        "admincount": false
+      },
+      "Members": [
+        {"MemberName": "HELPDESK1@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "HELPDESK2@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "HELPDESK3@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "IT_SUPPORT@CONTOSO.LOCAL", "MemberType": "User"}
+      ],
+      "Aces": [
+        {
+          "RightName": "GenericWrite",
+          "PrincipalName": "IT_SUPPORT@CONTOSO.LOCAL",
+          "PrincipalType": "User"
+        }
+      ]
+    },
+    {
+      "Properties": {
+        "name": "BACKUP OPERATORS@CONTOSO.LOCAL",
+        "samaccountname": "Backup Operators",
+        "admincount": true
+      },
+      "Members": [
+        {"MemberName": "SVC_BACKUP@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "BACKUP1@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "BACKUP2@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "BACKUP3@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "BACKUP4@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "BACKUP5@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "BACKUP6@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "BACKUP7@CONTOSO.LOCAL", "MemberType": "User"}
+      ],
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "ACCOUNT OPERATORS@CONTOSO.LOCAL",
+        "samaccountname": "Account Operators",
+        "admincount": true
+      },
+      "Members": [
+        {"MemberName": "IT_SUPPORT@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "HELPDESK1@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "HELPDESK2@CONTOSO.LOCAL", "MemberType": "User"}
+      ],
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "SERVER OPERATORS@CONTOSO.LOCAL",
+        "samaccountname": "Server Operators",
+        "admincount": true
+      },
+      "Members": [
+        {"MemberName": "SVC_SQL@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "SVC_WEB@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "IT_SUPPORT@CONTOSO.LOCAL", "MemberType": "User"}
+      ],
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "REMOTE DESKTOP USERS@CONTOSO.LOCAL",
+        "samaccountname": "Remote Desktop Users",
+        "admincount": false
+      },
+      "Members": [
+        {"MemberName": "HELPDESK@CONTOSO.LOCAL", "MemberType": "Group"},
+        {"MemberName": "IT_SUPPORT@CONTOSO.LOCAL", "MemberType": "User"}
+      ],
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "DNSADMINS@CONTOSO.LOCAL",
+        "samaccountname": "DnsAdmins",
+        "admincount": false
+      },
+      "Members": [
+        {"MemberName": "IT_SUPPORT@CONTOSO.LOCAL", "MemberType": "User"}
+      ],
+      "Aces": [
+        {
+          "RightName": "WriteOwner",
+          "PrincipalName": "HELPDESK@CONTOSO.LOCAL",
+          "PrincipalType": "Group"
+        }
+      ]
+    },
+    {
+      "Properties": {
+        "name": "EXCHANGE TRUSTED SUBSYSTEM@CONTOSO.LOCAL",
+        "samaccountname": "Exchange Trusted Subsystem",
+        "admincount": true
+      },
+      "Members": [
+        {"MemberName": "EXCHANGE01$@CONTOSO.LOCAL", "MemberType": "Computer"}
+      ],
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "IT DEPARTMENT@CONTOSO.LOCAL",
+        "samaccountname": "IT Department",
+        "admincount": false
+      },
+      "Members": [
+        {"MemberName": "JOHN.DOE@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "JANE.SMITH@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "MIKE.JOHNSON@CONTOSO.LOCAL", "MemberType": "User"},
+        {"MemberName": "IT_SUPPORT@CONTOSO.LOCAL", "MemberType": "User"}
+      ],
+      "Aces": [
+        {
+          "RightName": "AddMember",
+          "PrincipalName": "HELPDESK@CONTOSO.LOCAL",
+          "PrincipalType": "Group"
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "type": "groups",
+    "count": 10,
+    "version": 5
+  }
+}

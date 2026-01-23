@@ -21,8 +21,8 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False
 
-# CORS avec credentials
-CORS(app, supports_credentials=True, origins=['http://localhost:5173', 'http://localhost:5174', 'http://192.168.208.79:5173'])
+# CORS avec credentials - autoriser toutes les origines pour le dev
+CORS(app, supports_credentials=True, origins="*")
 
 logger.info('Flask application initialized')
 logger.debug(f'Database URI: {app.config["SQLALCHEMY_DATABASE_URI"]}')

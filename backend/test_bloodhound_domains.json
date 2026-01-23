@@ -1,0 +1,22 @@
+{
+  "data": [
+    {
+      "Properties": {
+        "name": "YOURLAB.LOCAL",
+        "functionallevel": "4"
+      },
+      "Aces": [
+        {
+          "RightName": "GetChangesAll",
+          "PrincipalName": "SVC_REPL@YOURLAB.LOCAL",
+          "PrincipalType": "User"
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "type": "domains",
+    "count": 1,
+    "version": 5
+  }
+}

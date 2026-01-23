@@ -1,0 +1,32 @@
+{
+  "data": [
+    {
+      "Properties": {
+        "name": "CONTOSO.LOCAL",
+        "functionallevel": "4"
+      },
+      "Aces": [
+        {
+          "RightName": "GetChanges",
+          "PrincipalName": "SVC_REPL@CONTOSO.LOCAL",
+          "PrincipalType": "User"
+        },
+        {
+          "RightName": "GetChangesAll",
+          "PrincipalName": "SVC_REPL@CONTOSO.LOCAL",
+          "PrincipalType": "User"
+        },
+        {
+          "RightName": "GenericWrite",
+          "PrincipalName": "EXCHANGE TRUSTED SUBSYSTEM@CONTOSO.LOCAL",
+          "PrincipalType": "Group"
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "type": "domains",
+    "count": 1,
+    "version": 5
+  }
+}

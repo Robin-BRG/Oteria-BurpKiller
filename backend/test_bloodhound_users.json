@@ -1,0 +1,95 @@
+{
+  "data": [
+    {
+      "Properties": {
+        "name": "SVC_SQL@YOURLAB.LOCAL",
+        "samaccountname": "svc_sql",
+        "enabled": true,
+        "admincount": false,
+        "hasspn": true,
+        "dontreqpreauth": false,
+        "unconstraineddelegation": false,
+        "pwdneverexpires": true,
+        "sensitive": false,
+        "sidhistory": [],
+        "serviceprincipalnames": ["MSSQLSvc/SQL01.YOURLAB.LOCAL:1433"]
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "SVC_BACKUP@YOURLAB.LOCAL",
+        "samaccountname": "svc_backup",
+        "enabled": true,
+        "admincount": false,
+        "hasspn": true,
+        "dontreqpreauth": true,
+        "unconstraineddelegation": false,
+        "pwdneverexpires": true,
+        "sensitive": false,
+        "sidhistory": [],
+        "serviceprincipalnames": ["HTTP/backup.YOURLAB.LOCAL"]
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "ADMIN_LEGACY@YOURLAB.LOCAL",
+        "samaccountname": "admin_legacy",
+        "enabled": true,
+        "admincount": true,
+        "hasspn": false,
+        "dontreqpreauth": true,
+        "unconstraineddelegation": false,
+        "pwdneverexpires": true,
+        "sensitive": false,
+        "sidhistory": ["S-1-5-21-1234567890-1234567890-1234567890-500"],
+        "serviceprincipalnames": []
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "USER_DELEGATION@YOURLAB.LOCAL",
+        "samaccountname": "user_delegation",
+        "enabled": true,
+        "admincount": false,
+        "hasspn": false,
+        "dontreqpreauth": false,
+        "unconstraineddelegation": true,
+        "pwdneverexpires": false,
+        "sensitive": false,
+        "sidhistory": [],
+        "serviceprincipalnames": []
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "JOHN.DOE@YOURLAB.LOCAL",
+        "samaccountname": "john.doe",
+        "enabled": true,
+        "admincount": false,
+        "hasspn": false,
+        "dontreqpreauth": false,
+        "unconstraineddelegation": false,
+        "pwdneverexpires": false,
+        "sensitive": false,
+        "sidhistory": [],
+        "serviceprincipalnames": []
+      },
+      "Aces": [
+        {
+          "RightName": "GenericAll",
+          "PrincipalName": "HELPDESK@YOURLAB.LOCAL",
+          "PrincipalType": "Group"
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "type": "users",
+    "count": 5,
+    "version": 5
+  }
+}

@@ -1,0 +1,187 @@
+{
+  "data": [
+    {
+      "Properties": {
+        "name": "SVC_SQL@CONTOSO.LOCAL",
+        "samaccountname": "svc_sql",
+        "enabled": true,
+        "admincount": false,
+        "hasspn": true,
+        "dontreqpreauth": false,
+        "unconstraineddelegation": false,
+        "pwdneverexpires": true,
+        "sensitive": false,
+        "sidhistory": [],
+        "serviceprincipalnames": ["MSSQLSvc/SQL01.contoso.local:1433", "MSSQLSvc/SQL01.contoso.local"]
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "SVC_WEB@CONTOSO.LOCAL",
+        "samaccountname": "svc_web",
+        "enabled": true,
+        "admincount": false,
+        "hasspn": true,
+        "dontreqpreauth": false,
+        "unconstraineddelegation": false,
+        "pwdneverexpires": true,
+        "sensitive": false,
+        "sidhistory": [],
+        "serviceprincipalnames": ["HTTP/web01.contoso.local", "HTTP/intranet.contoso.local"]
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "SVC_BACKUP@CONTOSO.LOCAL",
+        "samaccountname": "svc_backup",
+        "enabled": true,
+        "admincount": false,
+        "hasspn": true,
+        "dontreqpreauth": true,
+        "unconstraineddelegation": false,
+        "pwdneverexpires": true,
+        "sensitive": false,
+        "sidhistory": [],
+        "serviceprincipalnames": ["HTTP/backup.contoso.local"]
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "ADMIN_LEGACY@CONTOSO.LOCAL",
+        "samaccountname": "admin_legacy",
+        "enabled": true,
+        "admincount": true,
+        "hasspn": false,
+        "dontreqpreauth": true,
+        "unconstraineddelegation": false,
+        "pwdneverexpires": true,
+        "sensitive": false,
+        "sidhistory": ["S-1-5-21-1234567890-1234567890-1234567890-500"],
+        "serviceprincipalnames": []
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "USER_DELEGATE@CONTOSO.LOCAL",
+        "samaccountname": "user_delegate",
+        "enabled": true,
+        "admincount": false,
+        "hasspn": false,
+        "dontreqpreauth": false,
+        "unconstraineddelegation": true,
+        "pwdneverexpires": false,
+        "sensitive": false,
+        "sidhistory": [],
+        "serviceprincipalnames": []
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "JOHN.DOE@CONTOSO.LOCAL",
+        "samaccountname": "john.doe",
+        "enabled": true,
+        "admincount": false,
+        "hasspn": false,
+        "dontreqpreauth": false,
+        "unconstraineddelegation": false,
+        "pwdneverexpires": false,
+        "sensitive": false,
+        "sidhistory": [],
+        "serviceprincipalnames": []
+      },
+      "Aces": [
+        {
+          "RightName": "GenericAll",
+          "PrincipalName": "HELPDESK@CONTOSO.LOCAL",
+          "PrincipalType": "Group"
+        }
+      ]
+    },
+    {
+      "Properties": {
+        "name": "JANE.SMITH@CONTOSO.LOCAL",
+        "samaccountname": "jane.smith",
+        "enabled": true,
+        "admincount": false,
+        "hasspn": false,
+        "dontreqpreauth": false,
+        "unconstraineddelegation": false,
+        "pwdneverexpires": false,
+        "sensitive": false,
+        "sidhistory": [],
+        "serviceprincipalnames": []
+      },
+      "Aces": [
+        {
+          "RightName": "ForceChangePassword",
+          "PrincipalName": "IT_SUPPORT@CONTOSO.LOCAL",
+          "PrincipalType": "User"
+        }
+      ]
+    },
+    {
+      "Properties": {
+        "name": "MIKE.JOHNSON@CONTOSO.LOCAL",
+        "samaccountname": "mike.johnson",
+        "enabled": true,
+        "admincount": false,
+        "hasspn": false,
+        "dontreqpreauth": false,
+        "unconstraineddelegation": false,
+        "pwdneverexpires": false,
+        "sensitive": false,
+        "sidhistory": [],
+        "serviceprincipalnames": []
+      },
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "IT_SUPPORT@CONTOSO.LOCAL",
+        "samaccountname": "it_support",
+        "enabled": true,
+        "admincount": false,
+        "hasspn": false,
+        "dontreqpreauth": false,
+        "unconstraineddelegation": false,
+        "pwdneverexpires": false,
+        "sensitive": false,
+        "sidhistory": [],
+        "serviceprincipalnames": []
+      },
+      "Aces": [
+        {
+          "RightName": "WriteDacl",
+          "PrincipalName": "HELPDESK@CONTOSO.LOCAL",
+          "PrincipalType": "Group"
+        }
+      ]
+    },
+    {
+      "Properties": {
+        "name": "SVC_REPL@CONTOSO.LOCAL",
+        "samaccountname": "svc_repl",
+        "enabled": true,
+        "admincount": false,
+        "hasspn": true,
+        "dontreqpreauth": false,
+        "unconstraineddelegation": false,
+        "pwdneverexpires": true,
+        "sensitive": false,
+        "sidhistory": [],
+        "serviceprincipalnames": ["LDAP/dc01.contoso.local"]
+      },
+      "Aces": []
+    }
+  ],
+  "meta": {
+    "type": "users",
+    "count": 10,
+    "version": 5
+  }
+}

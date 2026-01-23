@@ -1,0 +1,61 @@
+{
+  "data": [
+    {
+      "Properties": {
+        "name": "DOMAIN ADMINS@YOURLAB.LOCAL",
+        "samaccountname": "Domain Admins",
+        "admincount": true
+      },
+      "Members": [
+        {"MemberName": "ADMINISTRATOR@YOURLAB.LOCAL", "MemberType": "User"},
+        {"MemberName": "ADMIN_LEGACY@YOURLAB.LOCAL", "MemberType": "User"},
+        {"MemberName": "IT_ADMIN1@YOURLAB.LOCAL", "MemberType": "User"},
+        {"MemberName": "IT_ADMIN2@YOURLAB.LOCAL", "MemberType": "User"},
+        {"MemberName": "IT_ADMIN3@YOURLAB.LOCAL", "MemberType": "User"},
+        {"MemberName": "SERVICE_ADMIN@YOURLAB.LOCAL", "MemberType": "User"},
+        {"MemberName": "BACKUP_ADMIN@YOURLAB.LOCAL", "MemberType": "User"}
+      ],
+      "Aces": []
+    },
+    {
+      "Properties": {
+        "name": "HELPDESK@YOURLAB.LOCAL",
+        "samaccountname": "HelpDesk",
+        "admincount": false
+      },
+      "Members": [
+        {"MemberName": "HELPDESK1@YOURLAB.LOCAL", "MemberType": "User"},
+        {"MemberName": "HELPDESK2@YOURLAB.LOCAL", "MemberType": "User"}
+      ],
+      "Aces": [
+        {
+          "RightName": "WriteDacl",
+          "PrincipalName": "IT_SUPPORT@YOURLAB.LOCAL",
+          "PrincipalType": "User"
+        }
+      ]
+    },
+    {
+      "Properties": {
+        "name": "BACKUP OPERATORS@YOURLAB.LOCAL",
+        "samaccountname": "Backup Operators",
+        "admincount": true
+      },
+      "Members": [
+        {"MemberName": "SVC_BACKUP@YOURLAB.LOCAL", "MemberType": "User"},
+        {"MemberName": "BACKUP1@YOURLAB.LOCAL", "MemberType": "User"},
+        {"MemberName": "BACKUP2@YOURLAB.LOCAL", "MemberType": "User"},
+        {"MemberName": "BACKUP3@YOURLAB.LOCAL", "MemberType": "User"},
+        {"MemberName": "BACKUP4@YOURLAB.LOCAL", "MemberType": "User"},
+        {"MemberName": "BACKUP5@YOURLAB.LOCAL", "MemberType": "User"},
+        {"MemberName": "BACKUP6@YOURLAB.LOCAL", "MemberType": "User"}
+      ],
+      "Aces": []
+    }
+  ],
+  "meta": {
+    "type": "groups",
+    "count": 3,
+    "version": 5
+  }
+}

@@ -1,20 +1,389 @@
 # -*- coding: utf-8 -*-
 """
 Module Active Directory - Enumeration LDAP, Kerberos, utilisateurs/groupes
++ Analyse BloodHound
 """
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
-from models import db, Investigation, ADScan, ADResult
+from models import db, Investigation, ADScan, ADResult, BloodHoundAnalysis, BloodHoundFile, BloodHoundFinding
 from datetime import datetime
+from werkzeug.utils import secure_filename
 import threading
 import socket
 import struct
 import base64
 import hashlib
 import time
+import json
+import uuid
+import os
 import re
+import zipfile
+import tempfile
 
 ad_bp = Blueprint('ad', __name__)
+
+# Dossier pour les fichiers BloodHound
+BLOODHOUND_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads', 'bloodhound')
+os.makedirs(BLOODHOUND_UPLOAD_FOLDER, exist_ok=True)
+
+
+# ============================================================================
+# PARSER BLOODHOUND JSON
+# ============================================================================
+
+class BloodHoundParser:
+    """Parser pour fichiers BloodHound JSON"""
+
+    # Relations dangereuses a detecter
+    DANGEROUS_RELATIONS = {
+        'GenericAll': {'severity': 'critical', 'description': 'Controle total sur l\'objet'},
+        'GenericWrite': {'severity': 'high', 'description': 'Peut modifier les attributs de l\'objet'},
+        'WriteOwner': {'severity': 'high', 'description': 'Peut changer le proprietaire de l\'objet'},
+        'WriteDacl': {'severity': 'critical', 'description': 'Peut modifier les ACLs de l\'objet'},
+        'AllExtendedRights': {'severity': 'high', 'description': 'Tous les droits etendus incluant DCSync'},
+        'ForceChangePassword': {'severity': 'high', 'description': 'Peut forcer le changement de mot de passe'},
+        'AddMember': {'severity': 'medium', 'description': 'Peut ajouter des membres au groupe'},
+        'Owns': {'severity': 'critical', 'description': 'Proprietaire de l\'objet'},
+        'DCSync': {'severity': 'critical', 'description': 'Peut repliquer les secrets du domaine'},
+        'GetChanges': {'severity': 'high', 'description': 'Droit de replication partiel'},
+        'GetChangesAll': {'severity': 'critical', 'description': 'Droit de replication complet (DCSync)'},
+        'AdminTo': {'severity': 'critical', 'description': 'Admin local sur la machine'},
+        'CanRDP': {'severity': 'medium', 'description': 'Peut se connecter en RDP'},
+        'CanPSRemote': {'severity': 'medium', 'description': 'Peut utiliser PSRemote'},
+        'ExecuteDCOM': {'severity': 'medium', 'description': 'Peut executer via DCOM'},
+        'AllowedToDelegate': {'severity': 'high', 'description': 'Delegation Kerberos configuree'},
+        'AllowedToAct': {'severity': 'high', 'description': 'Delegation basee sur les ressources'},
+        'AddAllowedToAct': {'severity': 'high', 'description': 'Peut configurer RBCD'},
+        'ReadLAPSPassword': {'severity': 'critical', 'description': 'Peut lire le mot de passe LAPS'},
+        'ReadGMSAPassword': {'severity': 'critical', 'description': 'Peut lire le mot de passe gMSA'},
+        'HasSIDHistory': {'severity': 'high', 'description': 'SID History permettant l\'usurpation'},
+        'SQLAdmin': {'severity': 'high', 'description': 'Admin SQL Server'},
+        'Contains': {'severity': 'info', 'description': 'Contient l\'objet (OU/Container)'},
+        'GPLink': {'severity': 'info', 'description': 'GPO liee'},
+    }
+
+    # Groupes privilegies
+    PRIVILEGED_GROUPS = [
+        'DOMAIN ADMINS', 'ENTERPRISE ADMINS', 'SCHEMA ADMINS',
+        'ADMINISTRATORS', 'ACCOUNT OPERATORS', 'BACKUP OPERATORS',
+        'SERVER OPERATORS', 'PRINT OPERATORS', 'DNSADMINS',
+        'DOMAIN CONTROLLERS', 'ENTERPRISE DOMAIN CONTROLLERS',
+        'KEY ADMINS', 'ENTERPRISE KEY ADMINS', 'PROTECTED USERS',
+        'CERT PUBLISHERS', 'REMOTE DESKTOP USERS', 'REMOTE MANAGEMENT USERS'
+    ]
+
+    def __init__(self):
+        self.users = []
+        self.computers = []
+        self.groups = []
+        self.domains = []
+        self.gpos = []
+        self.ous = []
+        self.containers = []
+        self.sessions = []
+        self.findings = []
+        self.domain_name = None
+
+    def parse_file(self, filepath):
+        """Parse un fichier BloodHound JSON"""
+        with open(filepath, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        # Detecter le type de fichier
+        if isinstance(data, dict):
+            if 'data' in data:
+                # Format BloodHound v4+
+                objects = data.get('data', [])
+                meta = data.get('meta', {})
+                file_type = meta.get('type', '').lower()
+            else:
+                # Fichier unique (domain, etc.)
+                objects = [data]
+                file_type = 'unknown'
+        elif isinstance(data, list):
+            objects = data
+            file_type = self._detect_type(objects[0] if objects else {})
+        else:
+            return 'unknown', 0
+
+        # Parser selon le type
+        count = len(objects)
+        for obj in objects:
+            self._parse_object(obj, file_type)
+
+        return file_type, count
+
+    def _detect_type(self, obj):
+        """Detecte le type d'objet BloodHound"""
+        props = obj.get('Properties', obj.get('properties', {}))
+
+        if 'samaccountname' in str(props).lower() and 'serviceprincipalnames' in str(props).lower():
+            return 'users'
+        elif 'operatingsystem' in str(props).lower():
+            return 'computers'
+        elif 'admincount' in str(props).lower() and 'samaccountname' in str(props).lower():
+            return 'groups'
+        elif 'functionallevel' in str(props).lower():
+            return 'domains'
+        elif 'gpcpath' in str(props).lower():
+            return 'gpos'
+        elif 'blocksinheritance' in str(props).lower():
+            return 'ous'
+        return 'unknown'
+
+    def _parse_object(self, obj, file_type):
+        """Parse un objet selon son type"""
+        props = obj.get('Properties', obj.get('properties', {}))
+        aces = obj.get('Aces', obj.get('aces', []))
+
+        if file_type == 'users' or self._is_user(props):
+            self._parse_user(obj, props, aces)
+        elif file_type == 'computers' or self._is_computer(props):
+            self._parse_computer(obj, props, aces)
+        elif file_type == 'groups' or self._is_group(props):
+            self._parse_group(obj, props, aces)
+        elif file_type == 'domains' or self._is_domain(props):
+            self._parse_domain(obj, props, aces)
+        elif file_type == 'gpos':
+            self.gpos.append(obj)
+        elif file_type == 'ous':
+            self.ous.append(obj)
+
+    def _is_user(self, props):
+        return 'samaccountname' in str(props).lower() and 'serviceprincipalnames' in str(props).lower()
+
+    def _is_computer(self, props):
+        return 'operatingsystem' in str(props).lower()
+
+    def _is_group(self, props):
+        return 'admincount' in str(props).lower() and not self._is_user(props)
+
+    def _is_domain(self, props):
+        return 'functionallevel' in str(props).lower()
+
+    def _parse_user(self, obj, props, aces):
+        """Parse un utilisateur et detecte les vulnerabilites"""
+        user_data = {
+            'name': props.get('name', props.get('samaccountname', 'Unknown')),
+            'samaccountname': props.get('samaccountname', ''),
+            'enabled': props.get('enabled', True),
+            'admincount': props.get('admincount', False),
+            'hasspn': props.get('hasspn', False),
+            'dontreqpreauth': props.get('dontreqpreauth', False),
+            'unconstraineddelegation': props.get('unconstraineddelegation', False),
+            'pwdneverexpires': props.get('pwdneverexpires', False),
+            'sensitive': props.get('sensitive', False),
+            'sidhistory': props.get('sidhistory', []),
+            'serviceprincipalnames': props.get('serviceprincipalnames', []),
+            'aces': aces,
+            'raw': obj
+        }
+        self.users.append(user_data)
+
+        # Detecter Kerberoasting
+        if user_data['hasspn'] and user_data['enabled']:
+            self.findings.append({
+                'category': 'kerberoast',
+                'severity': 'high',
+                'title': f"Kerberoastable: {user_data['name']}",
+                'description': f"L'utilisateur {user_data['name']} a un SPN configure et peut etre Kerberoaste.",
+                'affected_objects': {'user': user_data['name'], 'spns': user_data['serviceprincipalnames']},
+                'recommendation': 'Utiliser des mots de passe forts (25+ caracteres) pour les comptes de service ou migrer vers gMSA.',
+                'references': [{'name': 'MITRE ATT&CK', 'id': 'T1558.003'}]
+            })
+
+        # Detecter AS-REP Roasting
+        if user_data['dontreqpreauth'] and user_data['enabled']:
+            self.findings.append({
+                'category': 'asreproast',
+                'severity': 'high',
+                'title': f"AS-REP Roastable: {user_data['name']}",
+                'description': f"L'utilisateur {user_data['name']} n'a pas de pre-authentification Kerberos requise.",
+                'affected_objects': {'user': user_data['name']},
+                'recommendation': 'Activer la pre-authentification Kerberos pour ce compte.',
+                'references': [{'name': 'MITRE ATT&CK', 'id': 'T1558.004'}]
+            })
+
+        # Detecter delegation non contrainte
+        if user_data['unconstraineddelegation'] and user_data['enabled']:
+            self.findings.append({
+                'category': 'delegation',
+                'severity': 'critical',
+                'title': f"Unconstrained Delegation: {user_data['name']}",
+                'description': f"L'utilisateur {user_data['name']} a une delegation non contrainte, permettant de capturer des TGT.",
+                'affected_objects': {'user': user_data['name']},
+                'recommendation': 'Remplacer par une delegation contrainte ou basee sur les ressources.',
+                'references': [{'name': 'MITRE ATT&CK', 'id': 'T1558.001'}]
+            })
+
+        # Detecter SID History
+        if user_data['sidhistory']:
+            self.findings.append({
+                'category': 'sid_history',
+                'severity': 'high',
+                'title': f"SID History: {user_data['name']}",
+                'description': f"L'utilisateur {user_data['name']} a un SID History qui peut etre abuse.",
+                'affected_objects': {'user': user_data['name'], 'sidhistory': user_data['sidhistory']},
+                'recommendation': 'Supprimer le SID History si non necessaire.',
+                'references': [{'name': 'MITRE ATT&CK', 'id': 'T1134.005'}]
+            })
+
+    def _parse_computer(self, obj, props, aces):
+        """Parse un ordinateur et detecte les vulnerabilites"""
+        computer_data = {
+            'name': props.get('name', 'Unknown'),
+            'operatingsystem': props.get('operatingsystem', ''),
+            'enabled': props.get('enabled', True),
+            'unconstraineddelegation': props.get('unconstraineddelegation', False),
+            'allowedtodelegate': props.get('allowedtodelegate', []),
+            'haslaps': props.get('haslaps', False),
+            'aces': aces,
+            'raw': obj
+        }
+        self.computers.append(computer_data)
+
+        # Detecter delegation non contrainte sur les machines
+        if computer_data['unconstraineddelegation'] and computer_data['enabled']:
+            if 'DOMAIN CONTROLLER' not in computer_data['name'].upper():
+                self.findings.append({
+                    'category': 'delegation',
+                    'severity': 'critical',
+                    'title': f"Unconstrained Delegation: {computer_data['name']}",
+                    'description': f"La machine {computer_data['name']} a une delegation non contrainte.",
+                    'affected_objects': {'computer': computer_data['name']},
+                    'recommendation': 'Supprimer la delegation non contrainte sur les serveurs non-DC.',
+                    'references': [{'name': 'MITRE ATT&CK', 'id': 'T1558.001'}]
+                })
+
+        # Detecter OS obsolete
+        os_name = computer_data['operatingsystem'].lower() if computer_data['operatingsystem'] else ''
+        if any(old in os_name for old in ['2003', '2008', 'xp', 'vista', 'windows 7']):
+            self.findings.append({
+                'category': 'obsolete_os',
+                'severity': 'high',
+                'title': f"OS Obsolete: {computer_data['name']}",
+                'description': f"La machine {computer_data['name']} utilise un OS obsolete: {computer_data['operatingsystem']}",
+                'affected_objects': {'computer': computer_data['name'], 'os': computer_data['operatingsystem']},
+                'recommendation': 'Mettre a jour vers un systeme d\'exploitation supporte.',
+                'references': []
+            })
+
+    def _parse_group(self, obj, props, aces):
+        """Parse un groupe et detecte les vulnerabilites"""
+        group_data = {
+            'name': props.get('name', 'Unknown'),
+            'samaccountname': props.get('samaccountname', ''),
+            'admincount': props.get('admincount', False),
+            'members': obj.get('Members', obj.get('members', [])),
+            'aces': aces,
+            'raw': obj
+        }
+        self.groups.append(group_data)
+
+        # Verifier si c'est un groupe privilegie avec beaucoup de membres
+        group_upper = group_data['name'].upper()
+        for priv_group in self.PRIVILEGED_GROUPS:
+            if priv_group in group_upper:
+                member_count = len(group_data['members'])
+                if member_count > 5:
+                    self.findings.append({
+                        'category': 'privileged_group',
+                        'severity': 'medium',
+                        'title': f"Groupe privilegie surpeuple: {group_data['name']}",
+                        'description': f"Le groupe privilegie {group_data['name']} contient {member_count} membres.",
+                        'affected_objects': {'group': group_data['name'], 'member_count': member_count},
+                        'recommendation': 'Reduire le nombre de membres dans les groupes privilegies.',
+                        'references': []
+                    })
+                break
+
+    def _parse_domain(self, obj, props, aces):
+        """Parse un domaine"""
+        domain_data = {
+            'name': props.get('name', 'Unknown'),
+            'functionallevel': props.get('functionallevel', ''),
+            'aces': aces,
+            'raw': obj
+        }
+        self.domains.append(domain_data)
+        if not self.domain_name:
+            self.domain_name = domain_data['name']
+
+        # Verifier le niveau fonctionnel
+        level = domain_data['functionallevel']
+        if level and int(level) < 7:  # Windows Server 2016
+            level_names = {
+                0: 'Windows 2000', 1: 'Windows 2003 Mixed', 2: 'Windows 2003',
+                3: 'Windows 2008', 4: 'Windows 2008 R2', 5: 'Windows 2012',
+                6: 'Windows 2012 R2', 7: 'Windows 2016'
+            }
+            level_name = level_names.get(int(level), f'Level {level}')
+            self.findings.append({
+                'category': 'domain_config',
+                'severity': 'medium',
+                'title': f"Niveau fonctionnel du domaine bas: {level_name}",
+                'description': f"Le domaine {domain_data['name']} est au niveau fonctionnel {level_name}.",
+                'affected_objects': {'domain': domain_data['name'], 'level': level_name},
+                'recommendation': 'Elever le niveau fonctionnel du domaine si possible.',
+                'references': []
+            })
+
+    def analyze_acls(self):
+        """Analyse les ACLs pour trouver des chemins d'attaque"""
+        all_objects = self.users + self.computers + self.groups + self.domains
+
+        for obj in all_objects:
+            obj_name = obj.get('name', 'Unknown')
+            aces = obj.get('aces', [])
+
+            for ace in aces:
+                right_name = ace.get('RightName', ace.get('rightname', ''))
+                principal_name = ace.get('PrincipalName', ace.get('principalname', ''))
+                principal_type = ace.get('PrincipalType', ace.get('principaltype', ''))
+
+                if right_name in self.DANGEROUS_RELATIONS:
+                    rel_info = self.DANGEROUS_RELATIONS[right_name]
+
+                    # Ignorer certaines relations normales
+                    if principal_name.upper() in ['DOMAIN ADMINS', 'ENTERPRISE ADMINS', 'ADMINISTRATORS']:
+                        continue
+
+                    self.findings.append({
+                        'category': 'acl_abuse',
+                        'severity': rel_info['severity'],
+                        'title': f"{right_name}: {principal_name} -> {obj_name}",
+                        'description': f"{principal_name} ({principal_type}) a le droit {right_name} sur {obj_name}. {rel_info['description']}",
+                        'affected_objects': {
+                            'source': principal_name,
+                            'target': obj_name,
+                            'relation': right_name
+                        },
+                        'attack_path': [principal_name, right_name, obj_name],
+                        'recommendation': f"Verifier si {principal_name} a reellement besoin de ce droit sur {obj_name}.",
+                        'references': []
+                    })
+
+    def get_statistics(self):
+        """Retourne les statistiques de l'analyse"""
+        return {
+            'users_count': len(self.users),
+            'computers_count': len(self.computers),
+            'groups_count': len(self.groups),
+            'domains_count': len(self.domains),
+            'gpos_count': len(self.gpos),
+            'ous_count': len(self.ous),
+            'findings_count': len(self.findings),
+            'domain': self.domain_name
+        }
+
+    def get_findings_summary(self):
+        """Retourne un resume des findings par severite"""
+        summary = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0}
+        for f in self.findings:
+            sev = f.get('severity', 'info')
+            summary[sev] = summary.get(sev, 0) + 1
+        return summary
 
 
 # ============================================================================
@@ -513,3 +882,315 @@ def api_detect_dc(inv_id):
 
     result = detect_dc(target)
     return jsonify(result)
+
+
+# ============================================================================
+# ROUTES API BLOODHOUND
+# ============================================================================
+
+@ad_bp.route('/api/investigations/<int:inv_id>/bloodhound', methods=['POST'])
+@login_required
+def upload_bloodhound(inv_id):
+    """
+    Upload de fichiers BloodHound (JSON ou ZIP)
+    Lance automatiquement l'analyse apres l'upload
+    """
+    investigation = Investigation.query.get_or_404(inv_id)
+
+    if not investigation.user_can_edit(current_user):
+        return jsonify({'error': 'Non autorise'}), 403
+
+    if 'files' not in request.files and 'file' not in request.files:
+        return jsonify({'error': 'Aucun fichier fourni'}), 400
+
+    # Recuperer les fichiers (support single ou multiple)
+    files = request.files.getlist('files') or [request.files.get('file')]
+    files = [f for f in files if f and f.filename]
+
+    if not files:
+        return jsonify({'error': 'Aucun fichier valide'}), 400
+
+    # Creer l'analyse
+    analysis_name = request.form.get('name', f'Analyse BloodHound {datetime.utcnow().strftime("%Y-%m-%d %H:%M")}')
+    analysis = BloodHoundAnalysis(
+        investigation_id=inv_id,
+        started_by_id=current_user.id,
+        name=analysis_name,
+        status='running'
+    )
+    db.session.add(analysis)
+    db.session.commit()
+
+    # Creer un dossier pour cette analyse
+    analysis_folder = os.path.join(BLOODHOUND_UPLOAD_FOLDER, str(analysis.id))
+    os.makedirs(analysis_folder, exist_ok=True)
+
+    uploaded_files = []
+    json_files = []
+
+    for file in files:
+        original_filename = secure_filename(file.filename)
+        extension = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else ''
+        unique_filename = f"{uuid.uuid4().hex}.{extension}"
+        file_path = os.path.join(analysis_folder, unique_filename)
+        file.save(file_path)
+
+        # Si c'est un ZIP, extraire les fichiers JSON
+        if extension == 'zip':
+            try:
+                with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                    for zip_info in zip_ref.infolist():
+                        if zip_info.filename.endswith('.json'):
+                            extracted_path = zip_ref.extract(zip_info, analysis_folder)
+                            json_files.append(extracted_path)
+
+                            # Creer un enregistrement pour chaque fichier extrait
+                            bh_file = BloodHoundFile(
+                                analysis_id=analysis.id,
+                                filename=os.path.basename(extracted_path),
+                                original_filename=zip_info.filename,
+                                file_size=zip_info.file_size
+                            )
+                            db.session.add(bh_file)
+                            uploaded_files.append(bh_file)
+            except zipfile.BadZipFile:
+                analysis.status = 'failed'
+                analysis.error_message = 'Fichier ZIP invalide'
+                db.session.commit()
+                return jsonify({'error': 'Fichier ZIP invalide'}), 400
+        elif extension == 'json':
+            json_files.append(file_path)
+            file_size = os.path.getsize(file_path)
+
+            bh_file = BloodHoundFile(
+                analysis_id=analysis.id,
+                filename=unique_filename,
+                original_filename=original_filename,
+                file_size=file_size
+            )
+            db.session.add(bh_file)
+            uploaded_files.append(bh_file)
+        else:
+            continue
+
+    db.session.commit()
+
+    if not json_files:
+        analysis.status = 'failed'
+        analysis.error_message = 'Aucun fichier JSON BloodHound trouve'
+        db.session.commit()
+        return jsonify({'error': 'Aucun fichier JSON BloodHound trouve'}), 400
+
+    # Lancer l'analyse en arriere-plan
+    def run_analysis():
+        from app import app
+        with app.app_context():
+            try:
+                analysis_obj = db.session.get(BloodHoundAnalysis, analysis.id)
+                parser = BloodHoundParser()
+
+                # Parser tous les fichiers
+                for json_file in json_files:
+                    try:
+                        file_type, count = parser.parse_file(json_file)
+
+                        # Mettre a jour le type de fichier dans la DB
+                        bh_file = BloodHoundFile.query.filter_by(
+                            analysis_id=analysis.id,
+                            filename=os.path.basename(json_file)
+                        ).first()
+                        if bh_file:
+                            bh_file.file_type = file_type
+                            bh_file.objects_count = count
+                    except json.JSONDecodeError as e:
+                        continue
+                    except Exception as e:
+                        continue
+
+                # Analyser les ACLs
+                parser.analyze_acls()
+
+                # Mettre a jour les statistiques
+                stats = parser.get_statistics()
+                analysis_obj.domain = stats['domain']
+                analysis_obj.users_count = stats['users_count']
+                analysis_obj.computers_count = stats['computers_count']
+                analysis_obj.groups_count = stats['groups_count']
+                analysis_obj.domains_count = stats['domains_count']
+
+                # Sauvegarder les findings
+                for finding in parser.findings:
+                    bh_finding = BloodHoundFinding(
+                        analysis_id=analysis_obj.id,
+                        category=finding['category'],
+                        severity=finding['severity'],
+                        title=finding['title'],
+                        description=finding.get('description'),
+                        affected_objects=finding.get('affected_objects'),
+                        attack_path=finding.get('attack_path'),
+                        recommendation=finding.get('recommendation'),
+                        references=finding.get('references')
+                    )
+                    db.session.add(bh_finding)
+
+                analysis_obj.status = 'completed'
+                analysis_obj.completed_at = datetime.utcnow()
+                db.session.commit()
+
+            except Exception as e:
+                analysis_obj = db.session.get(BloodHoundAnalysis, analysis.id)
+                if analysis_obj:
+                    analysis_obj.status = 'failed'
+                    analysis_obj.error_message = str(e)
+                    db.session.commit()
+
+    thread = threading.Thread(target=run_analysis, daemon=True)
+    thread.start()
+
+    return jsonify({
+        'analysis': analysis.to_dict(),
+        'files_uploaded': len(uploaded_files),
+        'message': 'Analyse en cours...'
+    }), 201
+
+
+@ad_bp.route('/api/investigations/<int:inv_id>/bloodhound', methods=['GET'])
+@login_required
+def list_bloodhound_analyses(inv_id):
+    """Lister les analyses BloodHound d'une investigation"""
+    investigation = Investigation.query.get_or_404(inv_id)
+
+    if not investigation.user_can_view(current_user):
+        return jsonify({'error': 'Non autorise'}), 403
+
+    analyses = BloodHoundAnalysis.query.filter_by(
+        investigation_id=inv_id
+    ).order_by(BloodHoundAnalysis.created_at.desc()).all()
+
+    return jsonify([a.to_dict() for a in analyses])
+
+
+@ad_bp.route('/api/bloodhound/<int:analysis_id>', methods=['GET'])
+@login_required
+def get_bloodhound_analysis(analysis_id):
+    """Obtenir les details d'une analyse BloodHound"""
+    analysis = BloodHoundAnalysis.query.get_or_404(analysis_id)
+    investigation = Investigation.query.get(analysis.investigation_id)
+
+    if not investigation.user_can_view(current_user):
+        return jsonify({'error': 'Non autorise'}), 403
+
+    return jsonify(analysis.to_dict())
+
+
+@ad_bp.route('/api/bloodhound/<int:analysis_id>/files', methods=['GET'])
+@login_required
+def get_bloodhound_files(analysis_id):
+    """Obtenir les fichiers d'une analyse BloodHound"""
+    analysis = BloodHoundAnalysis.query.get_or_404(analysis_id)
+    investigation = Investigation.query.get(analysis.investigation_id)
+
+    if not investigation.user_can_view(current_user):
+        return jsonify({'error': 'Non autorise'}), 403
+
+    files = BloodHoundFile.query.filter_by(analysis_id=analysis_id).all()
+    return jsonify([f.to_dict() for f in files])
+
+
+@ad_bp.route('/api/bloodhound/<int:analysis_id>/findings', methods=['GET'])
+@login_required
+def get_bloodhound_findings(analysis_id):
+    """Obtenir les findings d'une analyse BloodHound"""
+    analysis = BloodHoundAnalysis.query.get_or_404(analysis_id)
+    investigation = Investigation.query.get(analysis.investigation_id)
+
+    if not investigation.user_can_view(current_user):
+        return jsonify({'error': 'Non autorise'}), 403
+
+    # Filtres optionnels
+    category = request.args.get('category')
+    severity = request.args.get('severity')
+
+    query = BloodHoundFinding.query.filter_by(analysis_id=analysis_id)
+
+    if category:
+        query = query.filter_by(category=category)
+    if severity:
+        query = query.filter_by(severity=severity)
+
+    findings = query.order_by(
+        db.case(
+            (BloodHoundFinding.severity == 'critical', 1),
+            (BloodHoundFinding.severity == 'high', 2),
+            (BloodHoundFinding.severity == 'medium', 3),
+            (BloodHoundFinding.severity == 'low', 4),
+            else_=5
+        )
+    ).all()
+
+    # Calculer le resume
+    summary = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0}
+    for f in BloodHoundFinding.query.filter_by(analysis_id=analysis_id).all():
+        summary[f.severity] = summary.get(f.severity, 0) + 1
+
+    return jsonify({
+        'analysis': analysis.to_dict(),
+        'summary': summary,
+        'findings': [f.to_dict() for f in findings]
+    })
+
+
+@ad_bp.route('/api/bloodhound/<int:analysis_id>', methods=['DELETE'])
+@login_required
+def delete_bloodhound_analysis(analysis_id):
+    """Supprimer une analyse BloodHound"""
+    analysis = BloodHoundAnalysis.query.get_or_404(analysis_id)
+    investigation = Investigation.query.get(analysis.investigation_id)
+
+    if not investigation.user_can_edit(current_user):
+        return jsonify({'error': 'Non autorise'}), 403
+
+    # Supprimer les fichiers physiques
+    analysis_folder = os.path.join(BLOODHOUND_UPLOAD_FOLDER, str(analysis_id))
+    if os.path.exists(analysis_folder):
+        import shutil
+        shutil.rmtree(analysis_folder)
+
+    # Supprimer en base (cascade supprimera files et findings)
+    db.session.delete(analysis)
+    db.session.commit()
+
+    return jsonify({'message': 'Analyse supprimee'})
+
+
+@ad_bp.route('/api/bloodhound/<int:analysis_id>/summary', methods=['GET'])
+@login_required
+def get_bloodhound_summary(analysis_id):
+    """Obtenir un resume de l'analyse pour le dashboard"""
+    analysis = BloodHoundAnalysis.query.get_or_404(analysis_id)
+    investigation = Investigation.query.get(analysis.investigation_id)
+
+    if not investigation.user_can_view(current_user):
+        return jsonify({'error': 'Non autorise'}), 403
+
+    # Compter par categorie
+    categories = db.session.query(
+        BloodHoundFinding.category,
+        db.func.count(BloodHoundFinding.id)
+    ).filter_by(analysis_id=analysis_id).group_by(BloodHoundFinding.category).all()
+
+    # Compter par severite
+    severities = db.session.query(
+        BloodHoundFinding.severity,
+        db.func.count(BloodHoundFinding.id)
+    ).filter_by(analysis_id=analysis_id).group_by(BloodHoundFinding.severity).all()
+
+    return jsonify({
+        'analysis': analysis.to_dict(),
+        'by_category': {cat: count for cat, count in categories},
+        'by_severity': {sev: count for sev, count in severities},
+        'top_findings': [f.to_dict() for f in BloodHoundFinding.query.filter_by(
+            analysis_id=analysis_id,
+            severity='critical'
+        ).limit(5).all()]
+    })

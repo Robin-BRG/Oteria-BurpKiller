@@ -66,6 +66,7 @@ class Investigation(db.Model):
     js_secrets = db.relationship('JsSecret', backref='investigation', lazy='dynamic', cascade='all, delete-orphan')
     network_scans = db.relationship('NetworkScan', backref='investigation', lazy='dynamic', cascade='all, delete-orphan')
     ad_scans = db.relationship('ADScan', backref='investigation', lazy='dynamic', cascade='all, delete-orphan')
+    bloodhound_analyses = db.relationship('BloodHoundAnalysis', backref='investigation', lazy='dynamic', cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<Investigation {self.name}>'
@@ -710,4 +711,151 @@ class ADResult(db.Model):
             'port': self.port,
             'service': self.service,
             'description': self.description
+        }
+
+
+# ============================================================================
+# MODELES BLOODHOUND ANALYSIS
+# ============================================================================
+
+class BloodHoundAnalysis(db.Model):
+    """Analyse de fichiers BloodHound"""
+    __tablename__ = 'bloodhound_analyses'
+
+    id = db.Column(db.Integer, primary_key=True)
+    investigation_id = db.Column(db.Integer, db.ForeignKey('investigations.id'), nullable=False)
+    started_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+
+    # Nom de l'analyse
+    name = db.Column(db.String(255), nullable=True)
+
+    # Domaine detecte
+    domain = db.Column(db.String(255), nullable=True)
+
+    # Statistiques
+    users_count = db.Column(db.Integer, default=0)
+    computers_count = db.Column(db.Integer, default=0)
+    groups_count = db.Column(db.Integer, default=0)
+    domains_count = db.Column(db.Integer, default=0)
+
+    # Status: pending, running, completed, failed
+    status = db.Column(db.String(20), default='pending')
+    error_message = db.Column(db.Text, nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime, nullable=True)
+
+    # Relations
+    started_by = db.relationship('User', backref='bloodhound_analyses')
+    findings = db.relationship('BloodHoundFinding', backref='analysis', lazy='dynamic', cascade='all, delete-orphan')
+    files = db.relationship('BloodHoundFile', backref='analysis', lazy='dynamic', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<BloodHoundAnalysis {self.id} - {self.domain}>'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'investigation_id': self.investigation_id,
+            'name': self.name,
+            'domain': self.domain,
+            'users_count': self.users_count,
+            'computers_count': self.computers_count,
+            'groups_count': self.groups_count,
+            'domains_count': self.domains_count,
+            'status': self.status,
+            'error_message': self.error_message,
+            'started_by': self.started_by.to_dict() if self.started_by else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+            'findings_count': self.findings.count(),
+            'files_count': self.files.count()
+        }
+
+
+class BloodHoundFile(db.Model):
+    """Fichier BloodHound uploade"""
+    __tablename__ = 'bloodhound_files'
+
+    id = db.Column(db.Integer, primary_key=True)
+    analysis_id = db.Column(db.Integer, db.ForeignKey('bloodhound_analyses.id'), nullable=False)
+
+    # Infos fichier
+    filename = db.Column(db.String(255), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    file_size = db.Column(db.Integer, nullable=True)
+
+    # Type: users, computers, groups, domains, sessions, ous, gpos, containers
+    file_type = db.Column(db.String(50), nullable=True)
+
+    # Nombre d'objets dans le fichier
+    objects_count = db.Column(db.Integer, default=0)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<BloodHoundFile {self.original_filename}>'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'analysis_id': self.analysis_id,
+            'filename': self.filename,
+            'original_filename': self.original_filename,
+            'file_size': self.file_size,
+            'file_type': self.file_type,
+            'objects_count': self.objects_count,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class BloodHoundFinding(db.Model):
+    """Resultat d'analyse BloodHound (vulnerabilite AD)"""
+    __tablename__ = 'bloodhound_findings'
+
+    id = db.Column(db.Integer, primary_key=True)
+    analysis_id = db.Column(db.Integer, db.ForeignKey('bloodhound_analyses.id'), nullable=False)
+
+    # Categorie: path_to_da, kerberoast, asreproast, delegation, acl_abuse, etc.
+    category = db.Column(db.String(50), nullable=False)
+
+    # Severite: critical, high, medium, low, info
+    severity = db.Column(db.String(20), nullable=False)
+
+    # Titre du finding
+    title = db.Column(db.String(255), nullable=False)
+
+    # Description detaillee
+    description = db.Column(db.Text, nullable=True)
+
+    # Objets impliques (JSON: source, target, relation)
+    affected_objects = db.Column(db.JSON, nullable=True)
+
+    # Chemin d'attaque (si applicable)
+    attack_path = db.Column(db.JSON, nullable=True)
+
+    # Recommandation
+    recommendation = db.Column(db.Text, nullable=True)
+
+    # References (MITRE, etc.)
+    references = db.Column(db.JSON, nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<BloodHoundFinding {self.category}: {self.title}>'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'analysis_id': self.analysis_id,
+            'category': self.category,
+            'severity': self.severity,
+            'title': self.title,
+            'description': self.description,
+            'affected_objects': self.affected_objects,
+            'attack_path': self.attack_path,
+            'recommendation': self.recommendation,
+            'references': self.references,
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }

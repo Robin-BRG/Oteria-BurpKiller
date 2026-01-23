@@ -174,6 +174,18 @@ logger.info('Operation successful')
 
 ---
 
+#### 5. Mise à jour des dépendances
+
+**Commit**: `pending` - Update requirements.txt for AD and Pentest tools
+
+- ➖ **Suppression** des bibliothèques inutilisées (Data Science)
+  - `numpy`, `pandas`, `matplotlib`, `scipy`
+
+- ➕ **Ajout** des bibliothèques de Pentest/AD
+  - `impacket`, `ldap3`, `dnspython`, `bloodhound`, `ldapdomaindump`
+
+---
+
 ### 📈 Impact sur la qualité du projet
 
 #### Avant cette branche

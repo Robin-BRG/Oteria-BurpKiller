@@ -391,6 +391,11 @@ function ADDisplay({ investigationId, targetHost }: ADDisplayProps) {
       case 'detection': return '🎯'
       case 'kerberos_info': return '🔐'
       case 'smb_info': return '📁'
+      case 'dns_info': return '🌐'
+      case 'netbios_info': return '💻'
+      case 'domain_info': return '🏛️'
+      case 'recommendation': return '📋'
+      case 'info': return 'ℹ️'
       default: return 'ℹ️'
     }
   }
@@ -407,7 +412,9 @@ function ADDisplay({ investigationId, targetHost }: ADDisplayProps) {
 
   const vulnerabilities = results.filter(r => r.result_type === 'vulnerability')
   const ports = results.filter(r => r.result_type === 'port')
-  const info = results.filter(r => !['vulnerability', 'port'].includes(r.result_type))
+  const domainInfo = results.filter(r => ['domain_info', 'detection', 'dns_info', 'netbios_info'].includes(r.result_type))
+  const recommendations = results.filter(r => r.result_type === 'recommendation')
+  const info = results.filter(r => !['vulnerability', 'port', 'domain_info', 'detection', 'dns_info', 'netbios_info', 'recommendation'].includes(r.result_type))
 
   // Categories BloodHound
   const bhCategories = Array.from(new Set(bhFindings.map(f => f.category)))
@@ -506,6 +513,57 @@ function ADDisplay({ investigationId, targetHost }: ADDisplayProps) {
 
           {results.length > 0 ? (
         <div className="ad-results">
+          {/* DOMAIN INFORMATION */}
+          {domainInfo.length > 0 && (
+            <div className="results-section domain-info">
+              <h4>Informations du domaine ({domainInfo.length})</h4>
+              <div className="results-list">
+                {domainInfo.map(item => (
+                  <div key={item.id} className="result-card domain-info">
+                    <div className="result-header">
+                      <span className="result-icon">{getResultTypeIcon(item.result_type)}</span>
+                      <span className="result-name">{item.name}</span>
+                    </div>
+                    {item.value && <p className="result-value highlight">{item.value}</p>}
+                    {item.description && <p className="result-description">{item.description}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* BLOODHOUND COLLECTION RECOMMENDATIONS */}
+          {recommendations.length > 0 && (
+            <div className="results-section recommendations">
+              <h4>Commandes BloodHound recommandees</h4>
+              <p className="section-hint">Utilisez ces commandes pour collecter les donnees BloodHound et les uploader dans l'onglet BloodHound</p>
+              <div className="results-list">
+                {recommendations.map(rec => (
+                  <div key={rec.id} className="result-card recommendation">
+                    <div className="result-header">
+                      <span className="result-icon">{getResultTypeIcon(rec.result_type)}</span>
+                      <span className="result-name">{rec.name}</span>
+                    </div>
+                    {rec.description && <p className="result-description">{rec.description}</p>}
+                    {rec.value && (
+                      <div className="command-box">
+                        <code>{rec.value}</code>
+                        <button
+                          className="btn-copy"
+                          onClick={() => navigator.clipboard.writeText(rec.value || '')}
+                          title="Copier la commande"
+                        >
+                          📋
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* VULNERABILITIES */}
           {vulnerabilities.length > 0 && (
             <div className="results-section vulnerabilities">
               <h4>Vulnerabilites detectees ({vulnerabilities.length})</h4>
@@ -527,6 +585,7 @@ function ADDisplay({ investigationId, targetHost }: ADDisplayProps) {
             </div>
           )}
 
+          {/* OPEN PORTS */}
           {ports.length > 0 && (
             <div className="results-section ports">
               <h4>Ports AD ouverts ({ports.length})</h4>
@@ -541,6 +600,7 @@ function ADDisplay({ investigationId, targetHost }: ADDisplayProps) {
             </div>
           )}
 
+          {/* OTHER INFORMATION */}
           {info.length > 0 && (
             <div className="results-section info">
               <h4>Informations collectees ({info.length})</h4>

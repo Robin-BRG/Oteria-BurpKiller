@@ -942,3 +942,140 @@
   margin: 0.25rem 0;
   font-size: 0.9rem;
 }
+
+/* Domain Info Section */
+.results-section.domain-info {
+  background: rgba(130, 80, 223, 0.03);
+  border: 1px solid rgba(130, 80, 223, 0.15);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+}
+
+.results-section.domain-info h4 {
+  color: #8250df;
+}
+
+.result-card.domain-info {
+  background: var(--bg-secondary);
+  border-left: 3px solid #8250df;
+}
+
+.result-value.highlight {
+  font-weight: 700;
+  color: #8250df;
+  font-size: 1.1rem;
+  margin: 0.5rem 0;
+}
+
+/* Recommendations Section */
+.results-section.recommendations {
+  background: rgba(26, 127, 55, 0.03);
+  border: 1px solid rgba(26, 127, 55, 0.15);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+}
+
+.results-section.recommendations h4 {
+  color: #1a7f37;
+}
+
+.section-hint {
+  margin: -0.5rem 0 1rem 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.result-card.recommendation {
+  background: var(--bg-secondary);
+  border-left: 3px solid #1a7f37;
+}
+
+.command-box {
+  position: relative;
+  margin-top: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+}
+
+.command-box code {
+  display: block;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  word-break: break-all;
+  padding-right: 2.5rem;
+}
+
+.btn-copy {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 1rem;
+}
+
+.btn-copy:hover {
+  background: rgba(130, 80, 223, 0.1);
+  border-color: #8250df;
+}
+
+.btn-copy:active {
+  transform: scale(0.95);
+}
+
+/* Results card enhancements */
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.result-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.result-name {
+  flex: 1;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.result-value {
+  margin: 0.5rem 0 0 0;
+  color: var(--text-primary);
+}
+
+.result-value.mono {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  background: var(--bg-tertiary);
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+}
+
+.result-description {
+  margin: 0.5rem 0 0 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.result-type-badge {
+  padding: 0.25rem 0.75rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-weight: 600;
+}

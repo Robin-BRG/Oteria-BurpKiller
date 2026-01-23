@@ -612,18 +612,18 @@ def check_kerberos(target, timeout=5):
 
 def scan_ad(target, scan_type='basic', progress_callback=None):
     """
-    Scanner un controleur de domaine Active Directory
+    Scanner un controleur de domaine Active Directory - VERSION COMPLETE
 
     Args:
         target: IP ou hostname du DC
-        scan_type: 'basic' (ports + LDAP), 'full' (+ SMB + Kerberos checks)
+        scan_type: 'basic' (ports + LDAP), 'full' (+ SMB + Kerberos + DNS + NetBIOS + vulnerabilites)
         progress_callback: fonction(current, total) pour le suivi
 
     Returns:
-        Liste de resultats
+        Liste de resultats avec analyse de vulnerabilites
     """
     all_results = []
-    steps = 4 if scan_type == 'full' else 2
+    steps = 7 if scan_type == 'full' else 3
     current = 0
 
     # Etape 1: Scan des ports AD
@@ -642,7 +642,15 @@ def scan_ad(target, scan_type='basic', progress_callback=None):
             'service': p['service']
         })
 
-    # Etape 2: Enumeration LDAP anonyme
+    # Etape 2: Enumeration DNS
+    if progress_callback:
+        progress_callback(current, steps)
+    current += 1
+
+    dns_results = enumerate_dns(target)
+    all_results.extend(dns_results)
+
+    # Etape 3: Enumeration LDAP anonyme
     if progress_callback:
         progress_callback(current, steps)
     current += 1
@@ -653,7 +661,15 @@ def scan_ad(target, scan_type='basic', progress_callback=None):
         all_results.extend(ldap_results)
 
     if scan_type == 'full':
-        # Etape 3: Verification SMB
+        # Etape 4: Enumeration NetBIOS
+        if progress_callback:
+            progress_callback(current, steps)
+        current += 1
+
+        netbios_results = enumerate_netbios(target)
+        all_results.extend(netbios_results)
+
+        # Etape 5: Verification SMB
         if progress_callback:
             progress_callback(current, steps)
         current += 1
@@ -662,7 +678,7 @@ def scan_ad(target, scan_type='basic', progress_callback=None):
             smb_results = check_null_session(target)
             all_results.extend(smb_results)
 
-        # Etape 4: Verification Kerberos
+        # Etape 6: Verification Kerberos
         if progress_callback:
             progress_callback(current, steps)
         current += 1
@@ -671,17 +687,239 @@ def scan_ad(target, scan_type='basic', progress_callback=None):
             krb_results = check_kerberos(target)
             all_results.extend(krb_results)
 
+        # Etape 7: Analyse des vulnerabilites
+        if progress_callback:
+            progress_callback(current, steps)
+        current += 1
+
+        vulnerabilities = analyze_ad_vulnerabilities(all_results)
+        all_results.extend(vulnerabilities)
+
     if progress_callback:
         progress_callback(steps, steps)
 
     return all_results
 
 
+def enumerate_dns(target, timeout=3):
+    """Enumerer les informations DNS pour detecter le domaine"""
+    results = []
+    try:
+        import socket
+        # Tenter de recuperer le FQDN
+        try:
+            fqdn = socket.getfqdn(target)
+            if fqdn != target and '.' in fqdn:
+                results.append({
+                    'type': 'dns_info',
+                    'name': 'FQDN',
+                    'value': fqdn,
+                    'severity': 'info'
+                })
+                # Extraire le domaine
+                parts = fqdn.split('.')
+                if len(parts) >= 2:
+                    domain = '.'.join(parts[-2:])
+                    results.append({
+                        'type': 'dns_info',
+                        'name': 'Possible Domain',
+                        'value': domain,
+                        'severity': 'info'
+                    })
+        except:
+            pass
+
+        # Tenter reverse DNS
+        try:
+            hostinfo = socket.gethostbyaddr(target)
+            if hostinfo and hostinfo[0]:
+                results.append({
+                    'type': 'dns_info',
+                    'name': 'Reverse DNS',
+                    'value': hostinfo[0],
+                    'severity': 'info'
+                })
+        except:
+            pass
+    except:
+        pass
+
+    return results
+
+
+def enumerate_netbios(target, timeout=3):
+    """Enumerer les informations NetBIOS"""
+    results = []
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(timeout)
+
+        # NetBIOS Name Query
+        query = bytes([
+            0x80, 0x94,  # Transaction ID
+            0x00, 0x00,  # Flags
+            0x00, 0x01,  # Questions
+            0x00, 0x00,  # Answer RRs
+            0x00, 0x00,  # Authority RRs
+            0x00, 0x00,  # Additional RRs
+            0x20, 0x43, 0x4b, 0x41, 0x41, 0x41, 0x41, 0x41,
+            0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41,
+            0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41,
+            0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41,
+            0x41, 0x41, 0x00,  # Name
+            0x00, 0x21,  # Type: NBSTAT
+            0x00, 0x01   # Class: IN
+        ])
+
+        sock.sendto(query, (target, 137))
+        data, _ = sock.recvfrom(4096)
+        sock.close()
+
+        if data and len(data) > 56:
+            # Parser la reponse NetBIOS
+            num_names = data[56]
+            offset = 57
+
+            for i in range(min(num_names, 10)):
+                if offset + 18 <= len(data):
+                    name = data[offset:offset+15].decode('ascii', errors='ignore').strip()
+                    name_type = data[offset+15]
+                    flags = struct.unpack('>H', data[offset+16:offset+18])[0]
+
+                    if name:
+                        results.append({
+                            'type': 'netbios_info',
+                            'name': f'NetBIOS Name ({hex(name_type)})',
+                            'value': name,
+                            'severity': 'info'
+                        })
+
+                    offset += 18
+    except:
+        pass
+
+    return results
+
+
+def analyze_ad_vulnerabilities(scan_results):
+    """Analyser les resultats du scan pour detecter des vulnerabilites AD"""
+    vulnerabilities = []
+
+    # Analyser les ports ouverts
+    open_ports = [r for r in scan_results if r.get('type') == 'port']
+    port_numbers = [p['port'] for p in open_ports]
+
+    # SMB Signing
+    if 445 in port_numbers:
+        vulnerabilities.append({
+            'type': 'vulnerability',
+            'name': 'SMB Service Detected',
+            'value': 'Port 445 ouvert',
+            'severity': 'medium',
+            'description': 'Le service SMB est accessible. Verifier si SMB signing est requis.',
+            'recommendation': 'Activer "Require SMB Signing" sur le DC pour prevenir les attaques relay.',
+            'mitre_id': 'T1187'
+        })
+
+    # LDAP non-secure
+    if 389 in port_numbers and 636 not in port_numbers:
+        vulnerabilities.append({
+            'type': 'vulnerability',
+            'name': 'LDAP without LDAPS',
+            'value': 'LDAP non-chiffre disponible',
+            'severity': 'high',
+            'description': 'LDAP est accessible sans chiffrement (pas de LDAPS sur 636).',
+            'recommendation': 'Configurer LDAPS et desactiver LDAP non-chiffre.',
+            'mitre_id': 'T1071.004'
+        })
+
+    # Kerberos pre-auth
+    if 88 in port_numbers:
+        vulnerabilities.append({
+            'type': 'info',
+            'name': 'Kerberos Service Active',
+            'value': 'Port 88 ouvert',
+            'severity': 'info',
+            'description': 'Service Kerberos accessible. Vulnerable aux attaques Kerberoasting et AS-REP Roasting si mal configure.',
+            'recommendation': 'S\'assurer que tous les comptes requirent la pre-authentification Kerberos.'
+        })
+
+    # LDAP Anonymous Bind
+    ldap_anon = [r for r in scan_results if r.get('name') == 'LDAP Anonymous Bind']
+    if ldap_anon:
+        vulnerabilities.append({
+            'type': 'vulnerability',
+            'name': 'LDAP Anonymous Bind Enabled',
+            'value': 'Connexion anonyme LDAP autorisee',
+            'severity': 'high',
+            'description': 'Le serveur LDAP accepte les connexions anonymes, permettant l\'enumeration complete du domaine sans authentification.',
+            'recommendation': 'Desactiver les connexions anonymes LDAP dans la GPO.',
+            'mitre_id': 'T1087.002'
+        })
+
+    return vulnerabilities
+
+
+def generate_bloodhound_commands(target, domain=None):
+    """Generer des commandes BloodHound pour l'enumeration"""
+    commands = []
+
+    # SharpHound
+    if domain:
+        commands.append({
+            'tool': 'SharpHound',
+            'description': 'Collection BloodHound depuis Windows (avec credentials)',
+            'command': f'SharpHound.exe -c All -d {domain} --ldapusername USER --ldappassword PASS'
+        })
+        commands.append({
+            'tool': 'SharpHound',
+            'description': 'Collection BloodHound depuis Windows (contexte actuel)',
+            'command': f'SharpHound.exe -c All -d {domain}'
+        })
+    else:
+        commands.append({
+            'tool': 'SharpHound',
+            'description': 'Collection BloodHound depuis Windows',
+            'command': 'SharpHound.exe -c All'
+        })
+
+    # BloodHound.py
+    if domain and target:
+        commands.append({
+            'tool': 'bloodhound-python',
+            'description': 'Collection BloodHound depuis Linux',
+            'command': f'bloodhound-python -u USER -p PASS -d {domain} -dc {target} -c All --zip'
+        })
+    elif target:
+        commands.append({
+            'tool': 'bloodhound-python',
+            'description': 'Collection BloodHound depuis Linux',
+            'command': f'bloodhound-python -u USER -p PASS -ns {target} -c All --zip'
+        })
+
+    # Enumeration alternative
+    commands.append({
+        'tool': 'ldapdomaindump',
+        'description': 'Dump LDAP pour analyse manuelle',
+        'command': f'ldapdomaindump -u "DOMAIN\\USER" -p PASS {target}'
+    })
+
+    commands.append({
+        'tool': 'crackmapexec',
+        'description': 'Enumeration SMB et utilisateurs',
+        'command': f'crackmapexec smb {target} -u USER -p PASS --users --groups --shares'
+    })
+
+    return commands
+
+
 def detect_dc(target):
-    """Detecter si une cible est probablement un controleur de domaine"""
+    """Detecter si une cible est probablement un controleur de domaine - VERSION COMPLETE"""
     dc_indicators = []
     score = 0
+    domain_info = {}
 
+    # Etape 1: Scan des ports AD
     ports = check_ad_ports(target)
     port_numbers = [p['port'] for p in ports]
 
@@ -707,11 +945,45 @@ def detect_dc(target):
 
     is_dc = score >= 5
 
+    # Etape 2: Enumeration DNS
+    dns_results = enumerate_dns(target)
+    for r in dns_results:
+        if r['name'] == 'Possible Domain':
+            domain_info['domain'] = r['value']
+        elif r['name'] == 'FQDN':
+            domain_info['fqdn'] = r['value']
+
+    # Etape 3: Enumeration NetBIOS
+    netbios_results = enumerate_netbios(target)
+    if netbios_results:
+        domain_info['netbios_names'] = [r['value'] for r in netbios_results]
+
+    # Etape 4: LDAP enumeration si AD detecte
+    ldap_results = []
+    if is_dc and 389 in port_numbers:
+        ldap_results = enumerate_ldap_anonymous(target, 389)
+        for r in ldap_results:
+            if 'DC=' in r.get('value', ''):
+                # Extraire le nom de domaine du DN
+                dn = r['value']
+                domain_parts = re.findall(r'DC=([^,\x00]+)', dn)
+                if domain_parts:
+                    domain_info['domain_dn'] = '.'.join(domain_parts)
+
     return {
         'is_dc': is_dc,
         'confidence': min(score * 10, 100),
         'indicators': dc_indicators,
-        'open_ports': ports
+        'open_ports': ports,
+        'domain_info': domain_info,
+        'dns_results': dns_results,
+        'netbios_results': netbios_results,
+        'ldap_results': ldap_results,
+        'detected_domain': domain_info.get('domain') or domain_info.get('domain_dn'),
+        'recommendations': generate_bloodhound_commands(
+            target,
+            domain_info.get('domain') or domain_info.get('domain_dn')
+        ) if is_dc else []
     }
 
 
@@ -768,11 +1040,11 @@ def start_ad_scan(inv_id):
                     scan_obj.progress_total = total
                     db.session.commit()
 
-                # D'abord detecter si c'est un DC
+                # D'abord detecter si c'est un DC avec detection complete
                 dc_detection = detect_dc(target)
 
                 if dc_detection['is_dc']:
-                    # C'est probablement un DC, on ajoute l'info
+                    # C'est probablement un DC, on ajoute l'info detaillee
                     result = ADResult(
                         scan_id=scan_obj.id,
                         result_type='detection',
@@ -783,7 +1055,32 @@ def start_ad_scan(inv_id):
                     )
                     db.session.add(result)
 
-                # Lancer le scan AD
+                    # Ajouter le domaine detecte si disponible
+                    if dc_detection.get('detected_domain'):
+                        result = ADResult(
+                            scan_id=scan_obj.id,
+                            result_type='domain_info',
+                            name='Domain Detected',
+                            value=dc_detection['detected_domain'],
+                            severity='info',
+                            description='Nom de domaine Active Directory detecte'
+                        )
+                        db.session.add(result)
+
+                    # Ajouter les recommandations BloodHound
+                    if dc_detection.get('recommendations'):
+                        for idx, rec in enumerate(dc_detection['recommendations'][:3]):
+                            result = ADResult(
+                                scan_id=scan_obj.id,
+                                result_type='recommendation',
+                                name=f"BloodHound Collection - {rec['tool']}",
+                                value=rec['command'],
+                                severity='info',
+                                description=rec['description']
+                            )
+                            db.session.add(result)
+
+                # Lancer le scan AD complet
                 results = scan_ad(target, scan_type, progress_callback)
 
                 # Sauvegarder les resultats
@@ -796,7 +1093,7 @@ def start_ad_scan(inv_id):
                         severity=r.get('severity', 'info'),
                         port=r.get('port'),
                         service=r.get('service'),
-                        description=r.get('description')
+                        description=r.get('description') or r.get('recommendation', '')
                     )
                     db.session.add(result)
 

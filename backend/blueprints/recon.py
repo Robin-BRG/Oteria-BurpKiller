@@ -9,7 +9,7 @@ import os
 
 recon_bp = Blueprint('recon', __name__)
 
-SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), 'scripts')
+SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), 'scripts', 'recon')
 sys.path.insert(0, SCRIPTS_DIR)
 
 from http_scanner import scan_http, COMMON_PATHS, AGGRESSIVE_PATHS

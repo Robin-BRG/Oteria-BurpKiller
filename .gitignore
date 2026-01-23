@@ -1,10 +1,48 @@
+# Claude Code
 .claude/
-nul
-backend/nul
-backend/uploads/
+
+# Python
 *.pyc
 __pycache__/
-.DS_Store
-node_modules/
+*.py[cod]
+*$py.class
+*.so
+.Python
 venv/
+ENV/
+env/
+
+# Database
+*.db
+*.sqlite
+backend/instance/
+
+# Logs
+*.log
+backend/logs/
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+**/rapport_test_*.html
+**/rapport_test_*.pdf
+**/test_report.html
+
+# Node
+node_modules/
+dist/
+.vite/
+*.local
+
+# IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Environment
 .env
+.env.local
+
+# Uploads
+backend/uploads/

@@ -9,7 +9,7 @@ import os
 
 vulns_bp = Blueprint('vulns', __name__)
 
-SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), 'scripts')
+SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), 'scripts', 'exploit')
 sys.path.insert(0, SCRIPTS_DIR)
 
 from sqli_scanner import scan_sqli_on_endpoints

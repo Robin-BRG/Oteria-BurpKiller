@@ -9,6 +9,7 @@ import HttpHistory from '../components/HttpHistory'
 import VulnDisplay from '../components/VulnDisplay'
 import NetworkDisplay from '../components/NetworkDisplay'
 import ADDisplay from '../components/ADDisplay'
+import ReportGenerator from '../components/ReportGenerator'
 import type { ReconResult } from '../components/ReconGraph'
 import type { EnumResult } from '../components/EnumDisplay'
 import './Investigation.css'
@@ -802,11 +803,12 @@ function Investigation() {
       case 'rapport':
         return (
           <div className="tab-content">
-            <div className="placeholder">
-              <h3>Rapport de pentest</h3>
-              <p>Synthese, vulnerabilites detectees, notes et export</p>
-              <p className="hint">Dashboard, score de securite, timeline, export PDF...</p>
-            </div>
+            {investigation && (
+              <ReportGenerator
+                investigationId={investigation.id}
+                investigationName={investigation.name}
+              />
+            )}
           </div>
         )
 

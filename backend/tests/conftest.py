@@ -39,7 +39,7 @@ def runner(app):
 @pytest.fixture
 def test_user(app):
     """Créer un utilisateur de test"""
-    from auth import bcrypt
+    from blueprints.auth import bcrypt
 
     user = User(
         username='testuser',

@@ -4,7 +4,7 @@ Script de test pour le systeme de reporting
 """
 from app import app, db
 from models import Investigation, User
-from report_generator import generate_html_report, generate_pdf_report
+from blueprints.report_generator import generate_html_report, generate_pdf_report
 import os
 
 def test_reporting():

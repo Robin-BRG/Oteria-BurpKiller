@@ -3,7 +3,7 @@
 Tests pour le module réseau
 """
 import pytest
-from network import resolve_target, scan_port, PORT_SERVICES
+from blueprints.network import resolve_target, scan_port, PORT_SERVICES
 
 
 class TestNetworkUtils:

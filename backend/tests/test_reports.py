@@ -3,7 +3,7 @@
 Tests pour le module de génération de rapports
 """
 import pytest
-from report_generator import generate_html_report
+from blueprints.report_generator import generate_html_report
 
 
 class TestReportGeneration:
